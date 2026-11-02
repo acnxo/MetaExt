@@ -57,6 +57,21 @@ jobs:
       - name: 单元测试
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
+      - name: 交易日历按周输出
+        # 该用例把整份日历按周一至周五逐周打印，默认不显示 t.Log，
+        # 这里单独加 -v 跑一次，并同步写入运行摘要，便于人工核对数据。
+        run: |
+          set -euo pipefail
+          go test ./component/quote/sina/finance/cnatradecalendar \
+            -run TestTradeCalendarWeeklyLayout -v -count=1 | tee calendar-layout.log
+          {
+            echo "### 交易日历按周输出"
+            echo
+            echo '```text'
+            awk 'length($0) == 56' calendar-layout.log | sed 's/^        //'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: 覆盖率摘要
         run: |
           summary="$(go tool cover -func=coverage.out | tail -n 1)"
