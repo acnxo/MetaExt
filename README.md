@@ -7,7 +7,7 @@ Meta External Impl —— 外部数据接口的 Go 实现集合。
 本项目是**公共基础库**，供其他 Go 项目以模块依赖的方式引用，目的是复用其中已有的
 公共逻辑与代码实现，而不是各自重复写一份。
 
-- 库本身不提供独立服务，运行入口 `cmd/starter` 仅作为调试与自检用途；
+- 库本身不提供独立服务，`_cmd/starter` 只是可执行示例，供本地验证与调试；
 - 下游项目通过 import 引用所需包，只取自己需要的部分，不强制引入全部依赖；
 - 包内实现保持通用，不绑定某一个调用方的业务假设、表结构或运行环境。
 
@@ -38,26 +38,28 @@ import (
 
 - Go 1.25 及以上
 
-## 构建与运行
+## 可执行示例
 
-程序入口位于 `cmd/starter/`。
+`_cmd/starter/` 是一个最小可执行示例，用于验证模块能正常构建运行。目录名以下划线开头，
+会被 Go 工具链忽略：`go build ./...`、`go list ./...`、`go test ./...` 都不会包含它，
+不影响本库作为纯包被下游引用。
 
 ```bash
 # 直接运行
-go run ./cmd/starter
+go run ./_cmd/starter
 
 # 编译到当前目录
-go build -o MetaExt ./cmd/starter
+go build -o MetaExt ./_cmd/starter
 
 # 注入版本号
-go build -ldflags "-X main.version=v0.1.0" -o MetaExt ./cmd/starter
+go build -ldflags "-X main.version=v0.1.0" -o MetaExt ./_cmd/starter
 ```
 
 ## 目录结构
 
 ```
-cmd/
-└── starter/            程序入口
+_cmd/
+└── starter/            可执行示例，不参与 ./... 构建
 component/              具体外部接口的实现，按品类与渠道分层组织
 base/                   最底层公共基座，不依赖本项目其他包
 model/                  跨层共享的数据模型
