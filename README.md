@@ -95,14 +95,15 @@ infra/                  配置、日志、存储等基础设施实现与装配
 
 ## 持续集成
 
-仓库内置两个 GitHub Actions 工作流，位于 `.github/workflows/`：
+仓库内置三个 GitHub Actions 工作流，位于 `.github/workflows/`：
 
 | 工作流 | 触发条件 | 内容 |
 | --- | --- | --- |
 | `CICD` | 推送或 PR 到 `main`、`dev`，或手动触发 | `gofmt` 检查、`go vet`、`go build ./...`、`go test -race` 并上传覆盖率报告 |
 | `Release` | 推送 `v*` 标签 | 先跑格式检查、`go vet`、`go test -race`，通过后创建 Release 并自动生成变更说明 |
+| `AutoTag` | 发版 PR 合并到 `main`，或手动触发 | 从 PR 标题解析版本号，打附注 tag 并创建 Release；标签已存在时跳过 |
 
-工作流文件为 `.github/workflows/CICD.yml` 与 `.github/workflows/Release.yml`。CI 使用的
+工作流文件为 `.github/workflows/CICD.yml`、`Release.yml` 与 `AutoTag.yml`。CI 使用的
 Go 版本从 `go.mod` 读取，不另外固定；覆盖率汇总会写入 Actions 的运行摘要。
 
 ## 许可
