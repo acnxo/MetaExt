@@ -23,7 +23,7 @@
 - 规范中的 `operationId` 与 Go 客户端方法名一致：`getKLine` 对应
   `component/quote/moomoo/quoteapiv2` 包中的 `Client.GetKLine`；
 - 查询参数在规范中的书写顺序就是签名输入的键序，与代码里的参数构造顺序一致；
-- 响应结构 `KlineResponse` 对应代码中的 `klinePayload`、`KlineItem` 对应 `klineItem`。
+- 响应结构 `KLineResponse` 对应代码中的 `klinePayload`、`KLineItem` 对应 `klineItem`。
 
 新增接口时，先补齐规格文档，再按同一命名规则实现客户端方法。
 

@@ -19,14 +19,14 @@ servers:
     description: 正式站点
 
 tags:
-  - name: Kline
+  - name: KLine
     description: K 线行情
 
 paths:
   /quote-api/quote-v2/get-kline:
     get:
       tags:
-        - Kline
+        - KLine
       operationId: getKLine
       summary: 拉取全量 K 线
       description: |
@@ -165,7 +165,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/KlineResponse"
+                $ref: "#/components/schemas/KLineResponse"
               examples:
                 success:
                   summary: 成功返回一根日 K
@@ -195,7 +195,7 @@ paths:
 
 components:
   schemas:
-    KlineResponse:
+    KLineResponse:
       type: object
       required:
         - code
@@ -211,19 +211,19 @@ components:
           example: 成功
         data:
           allOf:
-            - $ref: "#/components/schemas/KlineData"
+            - $ref: "#/components/schemas/KLineData"
           description: 业务数据，失败时可能为 null。
 
-    KlineData:
+    KLineData:
       type: object
       properties:
         list:
           type: array
           description: K 线序列，按时间升序（最早在前）。
           items:
-            $ref: "#/components/schemas/KlineItem"
+            $ref: "#/components/schemas/KLineItem"
 
-    KlineItem:
+    KLineItem:
       type: object
       description: |
         单根 K 线。字段类型存在字符串与数值混用的情况：开高低收与涨跌额通常为

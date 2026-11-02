@@ -59,8 +59,8 @@ func TestGetKLineRequestAndParse(t *testing.T) {
 		gotHeaders http.Header
 	)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != DefaultKlinePath {
-			t.Errorf("路径期望 %s，实际 %s", DefaultKlinePath, r.URL.Path)
+		if r.URL.Path != DefaultKLinePath {
+			t.Errorf("路径期望 %s，实际 %s", DefaultKLinePath, r.URL.Path)
 		}
 		gotHeaders = r.Header.Clone()
 		gotOrder, gotQuery = splitQuery(r.URL.RawQuery)
@@ -94,8 +94,8 @@ func TestGetKLineRequestAndParse(t *testing.T) {
 	if strings.Join(gotOrder, ",") != strings.Join(wantOrder, ",") {
 		t.Fatalf("查询键序不符：期望 %v，实际 %v", wantOrder, gotOrder)
 	}
-	if gotQuery["type"] != KlineTypeDay {
-		t.Fatalf("type 期望 %s，实际 %s", KlineTypeDay, gotQuery["type"])
+	if gotQuery["type"] != KLineTypeDay {
+		t.Fatalf("type 期望 %s，实际 %s", KLineTypeDay, gotQuery["type"])
 	}
 	if gotQuery["_"] != "1780507278122" {
 		t.Fatalf("时间戳未按注入时钟生成：%s", gotQuery["_"])
@@ -136,7 +136,7 @@ func TestGetKLineRequestAndParse(t *testing.T) {
 	}
 }
 
-// TestKlineExplicitParams 显式传入周期与时间戳时应原样使用，不被默认值覆盖。
+// TestGetKLineExplicitParams 显式传入周期与时间戳时应原样使用，不被默认值覆盖。
 func TestGetKLineExplicitParams(t *testing.T) {
 	var gotQuery map[string]string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +148,7 @@ func TestGetKLineExplicitParams(t *testing.T) {
 	client := newTestClient(t, server, nil)
 	bars, err := client.GetKLine(context.Background(), GetKLineRequest{
 		StockID:         " 1234 ",
-		KlineType:       "7",
+		KLineType:       "7",
 		TimestampMillis: "1700000000000",
 	})
 	if err != nil {
@@ -168,7 +168,7 @@ func TestGetKLineExplicitParams(t *testing.T) {
 	}
 }
 
-// TestKlineTokenRejected 业务码非 0 时应返回可判定的 APIError。
+// TestGetKLineTokenRejected 业务码非 0 时应返回可判定的 APIError。
 func TestGetKLineTokenRejected(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"code":-403,"message":"非法请求","data":null}`))
@@ -190,7 +190,7 @@ func TestGetKLineTokenRejected(t *testing.T) {
 	if apiErr.Code != CodeTokenInvalid || apiErr.Message != "非法请求" {
 		t.Fatalf("错误内容不符：%+v", apiErr)
 	}
-	if apiErr.Path != DefaultKlinePath || apiErr.URL == "" {
+	if apiErr.Path != DefaultKLinePath || apiErr.URL == "" {
 		t.Fatalf("错误应带上路径与地址：%+v", apiErr)
 	}
 	if !strings.Contains(err.Error(), "code=-403") {
@@ -198,7 +198,7 @@ func TestGetKLineTokenRejected(t *testing.T) {
 	}
 }
 
-// TestKlineOtherBusinessCode 其它业务码不应被判定为 token 被拒。
+// TestGetKLineOtherBusinessCode 其它业务码不应被判定为 token 被拒。
 func TestGetKLineOtherBusinessCode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"code":-1,"message":"系统繁忙","data":null}`))
@@ -212,7 +212,7 @@ func TestGetKLineOtherBusinessCode(t *testing.T) {
 	}
 }
 
-// TestKlineHTTPError 非 200 应返回带状态码的错误。
+// TestGetKLineHTTPError 非 200 应返回带状态码的错误。
 func TestGetKLineHTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
@@ -234,7 +234,7 @@ func TestGetKLineHTTPError(t *testing.T) {
 	}
 }
 
-// TestKlineParseError 响应不是合法 JSON 时应给出解析失败错误。
+// TestGetKLineParseError 响应不是合法 JSON 时应给出解析失败错误。
 func TestGetKLineParseError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("<html>not json</html>"))
@@ -251,7 +251,7 @@ func TestGetKLineParseError(t *testing.T) {
 	}
 }
 
-// TestKlineEmptyStockID 缺少 stockId 时本地直接报错，不发请求。
+// TestGetKLineEmptyStockID 缺少 stockId 时本地直接报错，不发请求。
 func TestGetKLineEmptyStockID(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -268,7 +268,7 @@ func TestGetKLineEmptyStockID(t *testing.T) {
 	}
 }
 
-// TestKlineContextCanceled 上下文取消后应返回错误。
+// TestGetKLineContextCanceled 上下文取消后应返回错误。
 func TestGetKLineContextCanceled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
@@ -291,8 +291,8 @@ func TestConfigDefaults(t *testing.T) {
 	if cfg.BaseURL != DefaultBaseURL {
 		t.Fatalf("BaseURL 期望 %s，实际 %s", DefaultBaseURL, cfg.BaseURL)
 	}
-	if cfg.Path != DefaultKlinePath {
-		t.Fatalf("Path 期望 %s，实际 %s", DefaultKlinePath, cfg.Path)
+	if cfg.Path != DefaultKLinePath {
+		t.Fatalf("Path 期望 %s，实际 %s", DefaultKLinePath, cfg.Path)
 	}
 	if cfg.Locale != DefaultLocale {
 		t.Fatalf("Locale 期望 %s，实际 %s", DefaultLocale, cfg.Locale)

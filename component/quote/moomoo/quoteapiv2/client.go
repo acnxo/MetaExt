@@ -30,8 +30,8 @@ import (
 const (
 	// DefaultBaseURL 接口站点。
 	DefaultBaseURL = "https://www.moomoo.com"
-	// DefaultKlinePath K 线接口路径。
-	DefaultKlinePath = "/quote-api/quote-v2/get-kline"
+	// DefaultKLinePath K 线接口路径。
+	DefaultKLinePath = "/quote-api/quote-v2/get-kline"
 	// DefaultLocale Cookie 中的语言标记。
 	DefaultLocale = "zh-cn"
 	// DefaultReferer 请求来源页。
@@ -40,8 +40,8 @@ const (
 	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 	// DefaultTimeout 单次请求超时。
 	DefaultTimeout = 20 * time.Second
-	// KlineTypeDay 日 K 线类型编号。
-	KlineTypeDay = "2"
+	// KLineTypeDay 日 K 线类型编号。
+	KLineTypeDay = "2"
 )
 
 // 业务错误码。
@@ -117,7 +117,7 @@ func (c Config) withDefaults() Config {
 	}
 	c.BaseURL = strings.TrimRight(c.BaseURL, "/")
 	if strings.TrimSpace(c.Path) == "" {
-		c.Path = DefaultKlinePath
+		c.Path = DefaultKLinePath
 	}
 	if !strings.HasPrefix(c.Path, "/") {
 		c.Path = "/" + c.Path
@@ -169,8 +169,8 @@ type GetKLineRequest struct {
 	StockID string
 	// MarketType 市场类型。
 	MarketType string
-	// KlineType 周期类型，为空取 KlineTypeDay。
-	KlineType string
+	// KLineType 周期类型，为空取 KLineTypeDay。
+	KLineType string
 	// MarketCode 市场代码。
 	MarketCode string
 	// InstrumentType 标的类型。
@@ -181,9 +181,9 @@ type GetKLineRequest struct {
 	TimestampMillis string
 }
 
-// KlineBar 一根 K 线，保持接口原始口径：时间为秒级 UNIX 时间戳，价格保留字符串
+// KLineBar 一根 K 线，保持接口原始口径：时间为秒级 UNIX 时间戳，价格保留字符串
 // 以免浮点精度损失，数值仅在明确是数字时使用 float64 承载。由 GetKLine 返回。
-type KlineBar struct {
+type KLineBar struct {
 	// Time 秒级 UNIX 时间戳。
 	Time int64
 	// Open 开盘价原始字符串，可能为空。
@@ -210,13 +210,13 @@ type KlineBar struct {
 //
 // 该接口无分页与时间范围参数，一次返回全部历史数据；返回值按时间升序（最早在前），
 // 与接口顺序一致，区间过滤由调用方完成。
-func (c *Client) GetKLine(ctx context.Context, req GetKLineRequest) ([]KlineBar, error) {
+func (c *Client) GetKLine(ctx context.Context, req GetKLineRequest) ([]KLineBar, error) {
 	if strings.TrimSpace(req.StockID) == "" {
 		return nil, errors.New("moomoo GetKLine：stockId 不能为空")
 	}
-	klineType := strings.TrimSpace(req.KlineType)
+	klineType := strings.TrimSpace(req.KLineType)
 	if klineType == "" {
-		klineType = KlineTypeDay
+		klineType = KLineTypeDay
 	}
 	timestamp := strings.TrimSpace(req.TimestampMillis)
 	if timestamp == "" {
@@ -316,11 +316,11 @@ type klineData struct {
 	List []klineItem `json:"list"`
 }
 
-// Bars 把原始条目转换为 KlineBar 切片。
-func (p klineData) Bars() []KlineBar {
-	bars := make([]KlineBar, 0, len(p.List))
+// Bars 把原始条目转换为 KLineBar 切片。
+func (p klineData) Bars() []KLineBar {
+	bars := make([]KLineBar, 0, len(p.List))
 	for _, item := range p.List {
-		bar := KlineBar{
+		bar := KLineBar{
 			Time:        item.K,
 			Open:        item.O.String(),
 			High:        item.H.String(),
