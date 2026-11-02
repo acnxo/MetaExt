@@ -20,8 +20,14 @@
 | 站点 | `https://finance.sina.com.cn` |
 | 路径 | `/realstock/company/klc_td_sh.txt` |
 | operationId | `getTradeCalendar` |
-| 代码入口 | `cnatradecalendar.Client.GetTradeCalendar` |
+| 代码入口 | `cnatradecalendar.Client.GetTradeCalendar`、`cnatradecalendar.Client.GetCNATradeCalendar` |
 | 响应类型 | `text/plain`（非 JSON） |
+
+## 对外建议
+
+优先使用 `GetCNATradeCalendar`：它在数据源内容上补齐了缺失的 `1992-05-04`，
+返回 8797 个交易日，可直接用于「某天是否交易日」的判断。需要核对数据源原始状态时
+再用 `GetTradeCalendar`（8796 个交易日，保留缺口）。
 
 ## 格式要点
 
@@ -46,7 +52,7 @@ var datelist="LC/AAApNDXCw6mHbaPgkryxXv10eAJP1LW0SD39...";var KLC_TD_SH=datelist
 | 交易日数量 | 8796 |
 | 日期范围 | 1990-12-19 至 2026-12-31 |
 | 缓存策略 | `cache-control: max-age=120`，`last-modified` 指示生成时间 |
-| 已知缺口 | 1992-05-04 未收录，代码不擅自补 |
+| 已知缺口 | 1992-05-04 未收录；`GetTradeCalendar` 如实返回，`GetCNATradeCalendar` 已补齐 |
 
 ## 实现与测试
 
@@ -57,9 +63,11 @@ var datelist="LC/AAApNDXCw6mHbaPgkryxXv10eAJP1LW0SD39...";var KLC_TD_SH=datelist
 | `client.go` | 配置、HTTP 请求、`APIError` 与 `ErrNoData` |
 | `decode.go` | 编码串提取、位流读取、日期还原 |
 | `calendar.go` | `TradeCalendar` 与 `IsTradeDay` 等查询方法 |
+| `cna.go` | `GetCNATradeCalendar`、缺口补齐、两市开市日 |
 | `decode_test.go` | 真实样本解析、校验和、截断、边界游标 |
 | `client_test.go` | 请求头、非 200、网络错误、上下文取消、读取失败 |
 | `calendar_test.go` | 空日历、首尾日期、时区语义 |
+| `cna_test.go` | 缺口补齐、幂等性、不改入参、开市日 |
 
 单包覆盖率 100%，测试不依赖网络：样本是抓取到的真实文本，内嵌在测试中。
 
@@ -67,5 +75,8 @@ var datelist="LC/AAApNDXCw6mHbaPgkryxXv10eAJP1LW0SD39...";var KLC_TD_SH=datelist
 
 - 该资源不是厂商文档化的 API，编码格式可能随站点调整；
 - 校验和不匹配、数据提前结束时直接报错，不返回部分结果；
-- 数据源存在缺口（如 1992-05-04），需要补数据时由调用方自行处理；
+- 数据源存在缺口（如 1992-05-04）：`GetTradeCalendar` 如实返回，`GetCNATradeCalendar`
+  会补齐，对外建议用后者；
+- 本资源是沪市日历，起点 `1990-12-19`；深市起点为 `1991-01-02`，两市早期交易日
+  不一致，判断深市标的需另行处理；
 - 站点按 `max-age=120` 缓存，调用方如需长期持有日历，建议自行加缓存并定期刷新。
