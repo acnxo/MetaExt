@@ -2,7 +2,7 @@
 
 获取 A 股交易日历。数据来自新浪财经的静态文本资源，`txt` 中是站点自定义编码的日期
 序列，需要解码后才能得到交易日列表。机器可读规格见
-[Meta/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml](../../../../Meta/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml)。
+[Meta/OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml](../../../../../Meta/OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml)。
 
 ## 接口
 
