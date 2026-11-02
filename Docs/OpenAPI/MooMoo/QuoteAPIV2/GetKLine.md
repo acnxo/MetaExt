@@ -7,8 +7,8 @@
 | 项 | 内容 |
 | --- | --- |
 | 方法 | `GET` |
-| 路径 | `/quote-api/quote-v2/get-kline` |
 | 站点 | `https://www.moomoo.com` |
+| 路径 | `/quote-api/quote-v2/get-kline` |
 | operationId | `getKLine` |
 | 代码入口 | `Client.GetKLine`（`component/quote/moomoo/quoteapiv2` 包） |
 | 备注 | 接口没有分页，也没有起止时间参数，一次返回全部历史数据；返回顺序为时间升序（最早在前），区间过滤由调用方完成。 |
