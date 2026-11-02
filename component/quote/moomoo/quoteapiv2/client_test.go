@@ -51,8 +51,8 @@ func splitQuery(raw string) ([]string, map[string]string) {
 	return order, values
 }
 
-// TestGetKlineRequestAndParse 校验请求装配（路径、键序、token、请求头）与响应解析。
-func TestGetKlineRequestAndParse(t *testing.T) {
+// TestGetKLineRequestAndParse 校验请求装配（路径、键序、token、请求头）与响应解析。
+func TestGetKLineRequestAndParse(t *testing.T) {
 	var (
 		gotOrder   []string
 		gotQuery   map[string]string
@@ -79,7 +79,7 @@ func TestGetKlineRequestAndParse(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	bars, err := client.GetKline(context.Background(), GetKlineRequest{
+	bars, err := client.GetKLine(context.Background(), GetKLineRequest{
 		StockID:           "70000294",
 		MarketType:        "2",
 		MarketCode:        "70",
@@ -137,7 +137,7 @@ func TestGetKlineRequestAndParse(t *testing.T) {
 }
 
 // TestKlineExplicitParams 显式传入周期与时间戳时应原样使用，不被默认值覆盖。
-func TestGetKlineExplicitParams(t *testing.T) {
+func TestGetKLineExplicitParams(t *testing.T) {
 	var gotQuery map[string]string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, gotQuery = splitQuery(r.URL.RawQuery)
@@ -146,7 +146,7 @@ func TestGetKlineExplicitParams(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	bars, err := client.GetKline(context.Background(), GetKlineRequest{
+	bars, err := client.GetKLine(context.Background(), GetKLineRequest{
 		StockID:         " 1234 ",
 		KlineType:       "7",
 		TimestampMillis: "1700000000000",
@@ -169,14 +169,14 @@ func TestGetKlineExplicitParams(t *testing.T) {
 }
 
 // TestKlineTokenRejected 业务码非 0 时应返回可判定的 APIError。
-func TestGetKlineTokenRejected(t *testing.T) {
+func TestGetKLineTokenRejected(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"code":-403,"message":"非法请求","data":null}`))
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	_, err := client.GetKline(context.Background(), GetKlineRequest{StockID: "70000294"})
+	_, err := client.GetKLine(context.Background(), GetKLineRequest{StockID: "70000294"})
 	if err == nil {
 		t.Fatal("应返回错误")
 	}
@@ -199,21 +199,21 @@ func TestGetKlineTokenRejected(t *testing.T) {
 }
 
 // TestKlineOtherBusinessCode 其它业务码不应被判定为 token 被拒。
-func TestGetKlineOtherBusinessCode(t *testing.T) {
+func TestGetKLineOtherBusinessCode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"code":-1,"message":"系统繁忙","data":null}`))
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	_, err := client.GetKline(context.Background(), GetKlineRequest{StockID: "123"})
+	_, err := client.GetKLine(context.Background(), GetKLineRequest{StockID: "123"})
 	if err == nil || IsTokenRejected(err) {
 		t.Fatalf("应返回普通业务错误，实际 %v", err)
 	}
 }
 
 // TestKlineHTTPError 非 200 应返回带状态码的错误。
-func TestGetKlineHTTPError(t *testing.T) {
+func TestGetKLineHTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = w.Write([]byte("bad gateway"))
@@ -221,7 +221,7 @@ func TestGetKlineHTTPError(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	_, err := client.GetKline(context.Background(), GetKlineRequest{StockID: "123"})
+	_, err := client.GetKLine(context.Background(), GetKLineRequest{StockID: "123"})
 	if err == nil {
 		t.Fatal("应返回错误")
 	}
@@ -235,14 +235,14 @@ func TestGetKlineHTTPError(t *testing.T) {
 }
 
 // TestKlineParseError 响应不是合法 JSON 时应给出解析失败错误。
-func TestGetKlineParseError(t *testing.T) {
+func TestGetKLineParseError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("<html>not json</html>"))
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	_, err := client.GetKline(context.Background(), GetKlineRequest{StockID: "123"})
+	_, err := client.GetKLine(context.Background(), GetKLineRequest{StockID: "123"})
 	if err == nil || !strings.Contains(err.Error(), "响应解析失败") {
 		t.Fatalf("应返回解析失败错误，实际 %v", err)
 	}
@@ -252,7 +252,7 @@ func TestGetKlineParseError(t *testing.T) {
 }
 
 // TestKlineEmptyStockID 缺少 stockId 时本地直接报错，不发请求。
-func TestGetKlineEmptyStockID(t *testing.T) {
+func TestGetKLineEmptyStockID(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
@@ -260,7 +260,7 @@ func TestGetKlineEmptyStockID(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server, nil)
-	if _, err := client.GetKline(context.Background(), GetKlineRequest{StockID: "   "}); err == nil {
+	if _, err := client.GetKLine(context.Background(), GetKLineRequest{StockID: "   "}); err == nil {
 		t.Fatal("stockId 为空应报错")
 	}
 	if called {
@@ -269,7 +269,7 @@ func TestGetKlineEmptyStockID(t *testing.T) {
 }
 
 // TestKlineContextCanceled 上下文取消后应返回错误。
-func TestGetKlineContextCanceled(t *testing.T) {
+func TestGetKLineContextCanceled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		_, _ = w.Write([]byte(`{"code":0,"data":{"list":[]}}`))
@@ -279,7 +279,7 @@ func TestGetKlineContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	client := newTestClient(t, server, nil)
-	if _, err := client.GetKline(ctx, GetKlineRequest{StockID: "123"}); err == nil {
+	if _, err := client.GetKLine(ctx, GetKLineRequest{StockID: "123"}); err == nil {
 		t.Fatal("上下文已取消时应返回错误")
 	}
 }

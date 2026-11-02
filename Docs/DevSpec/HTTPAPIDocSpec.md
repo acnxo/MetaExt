@@ -27,8 +27,8 @@ component/<品类>/<渠道>/<接口组>/
 
 | 对象 | 规则 | 示例 |
 | --- | --- | --- |
-| 方法名 | 取接口路径末段的驼峰形式 | `/quote-api/quote-v2/get-kline` → `GetKline` |
-| 请求类型 | 方法名 + `Request` | `GetKlineRequest` |
+| 方法名 | 取接口路径末段的驼峰形式 | `/quote-api/quote-v2/get-kline` → `GetKLine` |
+| 请求类型 | 方法名 + `Request` | `GetKLineRequest` |
 | 返回元素类型 | 接口语义 + 元素名 | `KlineBar` |
 | 配置/客户端 | 固定为 `Config` / `Client`，构造函数 `New` | `New(Config{})` |
 | 私有 DTO | 小写，与接口字段对应 | `klinePayload`、`klineItem` |

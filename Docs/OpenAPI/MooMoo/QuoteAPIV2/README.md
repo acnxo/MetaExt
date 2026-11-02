@@ -15,13 +15,13 @@
 ## 命名约定
 
 - 文件名取接口路径末段的驼峰形式，与 Go 客户端方法名保持一致：
-  `get-kline` → `GetKLine`，对应 `Client.GetKline`；
+  `get-kline` → `GetKLine`，对应 `Client.GetKLine`；
 - 新增接口时按同一规则成对添加 `.yaml` 与 `.md`。
 
 ## 与代码的对应关系
 
-- 规范中的 `operationId` 与 Go 客户端方法名一致：`getKline` 对应
-  `component/quote/moomoo/quoteapiv2` 包中的 `Client.GetKline`；
+- 规范中的 `operationId` 与 Go 客户端方法名一致：`getKLine` 对应
+  `component/quote/moomoo/quoteapiv2` 包中的 `Client.GetKLine`；
 - 查询参数在规范中的书写顺序就是签名输入的键序，与代码里的参数构造顺序一致；
 - 响应结构 `KlineResponse` 对应代码中的 `klinePayload`、`KlineItem` 对应 `klineItem`。
 

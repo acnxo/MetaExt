@@ -27,7 +27,7 @@ paths:
     get:
       tags:
         - Kline
-      operationId: getKline
+      operationId: getKLine
       summary: 拉取全量 K 线
       description: |
         按标的与周期返回全部历史 K 线。接口没有分页、没有起止时间参数，

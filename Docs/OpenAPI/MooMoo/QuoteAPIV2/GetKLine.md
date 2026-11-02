@@ -9,8 +9,8 @@
 | 方法 | `GET` |
 | 路径 | `/quote-api/quote-v2/get-kline` |
 | 站点 | `https://www.moomoo.com` |
-| operationId | `getKline` |
-| 代码入口 | `Client.GetKline`（`component/quote/moomoo/quoteapiv2` 包） |
+| operationId | `getKLine` |
+| 代码入口 | `Client.GetKLine`（`component/quote/moomoo/quoteapiv2` 包） |
 
 接口没有分页，也没有起止时间参数，一次返回全部历史数据；返回顺序为时间升序
 （最早在前），区间过滤由调用方完成。
@@ -75,28 +75,30 @@
 | --- | --- | --- |
 | `code` | integer | 业务码，`0` 表示成功 |
 | `message` | string | 业务提示，成功时通常为「成功」 |
-| `data` | object \| null | 业务数据，失败时可能为 `null` |
+| `data` | object | 业务数据，失败时可能为 `null` |
 | `data.list` | array | K 线序列，按时间升序 |
 
 ### K 线字段
 
 `data.list` 的每个元素是一根 K 线：
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `k` | integer | K 线时间，秒级 UNIX 时间戳 |
-| `o` | string \| number | 开盘价 |
-| `h` | string \| number | 最高价 |
-| `l` | string \| number | 最低价 |
-| `c` | string \| number | 收盘价 |
-| `v` | string \| number | 成交量 |
-| `t` | string \| number | 成交额 |
-| `r` | string \| number \| null | 涨跌幅，样本中均为 `null` |
-| `lc` | string \| number | 昨收价 |
-| `cp` | string \| number | 涨跌额，含符号，通常为字符串 |
+| 字段 | 字符串 | 数值 | 说明 |
+| --- | --- | --- | --- |
+| `k` | 否 | 是（整数） | K 线时间，秒级 UNIX 时间戳 |
+| `o` | 是 | 是 | 开盘价 |
+| `h` | 是 | 是 | 最高价 |
+| `l` | 是 | 是 | 最低价 |
+| `c` | 是 | 是 | 收盘价 |
+| `v` | 是 | 是 | 成交量 |
+| `t` | 是 | 是 | 成交额 |
+| `r` | 是 | 是 | 涨跌幅，可能为 `null`，样本中均为 `null` |
+| `lc` | 是 | 是 | 昨收价 |
+| `cp` | 是 | 是 | 涨跌额，含符号，通常为字符串 |
 
-接口对字段类型存在混用：开高低收与涨跌额通常给字符串，量与额通常给数值，缺失时可能为
-`null`。实现上按原始文本保留价格，避免浮点精度损失。
+「字符串」与「数值」两列分别表示该字段是否可能以该形式出现；两列都是「是」时，
+以哪一列为准取决于当次响应，不能假定固定类型。接口对类型存在混用：开高低收与涨跌额
+通常给字符串，量与额通常给数值，缺失时可能为 `null`。实现上按原始文本保留价格，
+避免浮点精度损失。
 
 ### 示例
 

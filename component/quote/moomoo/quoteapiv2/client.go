@@ -5,7 +5,7 @@
 // 构造有序参数、签名、发请求、解析响应四步。
 //
 // 对外方法名与接口路径保持映射关系：取路径末段按驼峰命名，例如 /quote-api/quote-v2/
-// get-kline 对应 GetKline，要新增接口时沿用同一规则，以便从方法名直接看出调用的
+// get-kline 对应 GetKLine，要新增接口时沿用同一规则，以便从方法名直接看出调用的
 // 是哪个接口。请求参数与返回类型同样带上接口前缀，避免不同接口之间用泛泛的通用名。
 //
 // 请求流程上有两点必须遵守：
@@ -37,8 +37,7 @@ const (
 	// DefaultReferer 请求来源页。
 	DefaultReferer = "https://www.moomoo.com/"
 	// DefaultUserAgent 浏览器 UA；站点对非浏览器 UA 可能直接拒绝。
-	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-		"(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 	// DefaultTimeout 单次请求超时。
 	DefaultTimeout = 20 * time.Second
 	// KlineTypeDay 日 K 线类型编号。
@@ -160,12 +159,12 @@ func New(cfg Config) *Client {
 // Config 返回生效配置（已补齐默认值）。
 func (c *Client) Config() Config { return c.cfg }
 
-// GetKlineRequest K 线请求参数（对应 get-kline 接口）。
+// GetKLineRequest K 线请求参数（对应 get-kline 接口）。
 //
 // 五个定位参数（StockID / MarketType / MarketCode / InstrumentType /
 // SubInstrumentType）原样透传，不做语义换算：同一编号在不同接口含义不同，
 // 换算会引入难以排查的错位。
-type GetKlineRequest struct {
+type GetKLineRequest struct {
 	// StockID 标的编号，必填。
 	StockID string
 	// MarketType 市场类型。
@@ -183,7 +182,7 @@ type GetKlineRequest struct {
 }
 
 // KlineBar 一根 K 线，保持接口原始口径：时间为秒级 UNIX 时间戳，价格保留字符串
-// 以免浮点精度损失，数值仅在明确是数字时使用 float64 承载。由 GetKline 返回。
+// 以免浮点精度损失，数值仅在明确是数字时使用 float64 承载。由 GetKLine 返回。
 type KlineBar struct {
 	// Time 秒级 UNIX 时间戳。
 	Time int64
@@ -207,13 +206,13 @@ type KlineBar struct {
 	ChangePrice string
 }
 
-// GetKline 拉取全量 K 线序列（对应 get-kline 接口）。
+// GetKLine 拉取全量 K 线序列（对应 get-kline 接口）。
 //
 // 该接口无分页与时间范围参数，一次返回全部历史数据；返回值按时间升序（最早在前），
 // 与接口顺序一致，区间过滤由调用方完成。
-func (c *Client) GetKline(ctx context.Context, req GetKlineRequest) ([]KlineBar, error) {
+func (c *Client) GetKLine(ctx context.Context, req GetKLineRequest) ([]KlineBar, error) {
 	if strings.TrimSpace(req.StockID) == "" {
-		return nil, errors.New("moomoo GetKline：stockId 不能为空")
+		return nil, errors.New("moomoo GetKLine：stockId 不能为空")
 	}
 	klineType := strings.TrimSpace(req.KlineType)
 	if klineType == "" {
