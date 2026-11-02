@@ -17,9 +17,15 @@ func TestVersionInjected(t *testing.T) {
 	original := injected
 	t.Cleanup(func() { injected = original })
 
+	injected = "0.1.1"
+	if got := Version(); got != "0.1.1" {
+		t.Fatalf("期望注入值 0.1.1，实际 %s", got)
+	}
+
+	// 注入值带 v 时也统一去掉前缀，避免两种格式混用。
 	injected = "v0.1.1"
-	if got := Version(); got != "v0.1.1" {
-		t.Fatalf("期望注入值 v0.1.1，实际 %s", got)
+	if got := Version(); got != "0.1.1" {
+		t.Fatalf("带前缀的注入值应归一为 0.1.1，实际 %s", got)
 	}
 }
 
@@ -47,7 +53,7 @@ func TestUsable(t *testing.T) {
 	cases := map[string]bool{
 		"":        false,
 		"(devel)": false,
-		"v0.1.1":  true,
+		"0.1.1":   true,
 		"v1.0.0":  true,
 	}
 	for value, want := range cases {
@@ -74,8 +80,8 @@ func TestVersionFromMainModule(t *testing.T) {
 	stubBuildInfo(t, &debug.BuildInfo{
 		Main: debug.Module{Path: modulePath, Version: "v0.3.0"},
 	}, true)
-	if got := Version(); got != "v0.3.0" {
-		t.Fatalf("期望 v0.3.0，实际 %s", got)
+	if got := Version(); got != "0.3.0" {
+		t.Fatalf("期望 0.3.0，实际 %s", got)
 	}
 }
 
@@ -92,8 +98,8 @@ func TestVersionFromDependency(t *testing.T) {
 			{Path: modulePath, Version: "v0.1.1"},
 		},
 	}, true)
-	if got := Version(); got != "v0.1.1" {
-		t.Fatalf("期望 v0.1.1，实际 %s", got)
+	if got := Version(); got != "0.1.1" {
+		t.Fatalf("期望 0.1.1，实际 %s", got)
 	}
 }
 
@@ -120,5 +126,21 @@ func TestVersionBuildInfoUnavailable(t *testing.T) {
 	stubBuildInfo(t, nil, false)
 	if got := Version(); got != develVersion {
 		t.Fatalf("期望 %s，实际 %s", develVersion, got)
+	}
+}
+
+// TestNormalize 版本号统一去掉 v 前缀。
+func TestNormalize(t *testing.T) {
+	cases := map[string]string{
+		"0.1.1":       "0.1.1",
+		"v0.1.1":      "0.1.1",
+		"v1.0.0-rc.1": "1.0.0-rc.1",
+		"devel":       "devel",
+		"":            "",
+	}
+	for in, want := range cases {
+		if got := normalize(in); got != want {
+			t.Errorf("normalize(%q) 期望 %q，实际 %q", in, want, got)
+		}
 	}
 }

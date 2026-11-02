@@ -1,7 +1,7 @@
 name: AutoTag
 
 # 合并到 main 后按根目录 VERSION 文件自动打 tag 并创建 Release。
-# 版本号唯一来源是 VERSION（内容形如 v0.1.1），标签已存在时跳过，
+# 版本号唯一来源是 VERSION（内容形如 0.1.1，不带 v 前缀），标签已存在时跳过，
 # 因此可以重复触发；也可用 workflow_dispatch 手动补打。
 on:
   push:
@@ -44,7 +44,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "VERSION 声明的版本：${tag}"
+          echo "VERSION 声明的版本：${raw}，对应标签 ${tag}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
