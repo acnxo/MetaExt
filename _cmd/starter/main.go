@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"runtime"
+
+	"github.com/acnxo/MetaExt/base/version"
 )
 
-// version 为程序版本号，可在构建时通过 -ldflags 注入。
-var version = "dev"
-
 func main() {
-	fmt.Printf("MetaExt %s (%s, %s/%s)\n", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	// 版本号来自根目录 VERSION 文件，构建时由 CI 注入；拿不到时回退为 devel。
+	fmt.Printf("MetaExt %s (%s, %s/%s)\n",
+		version.Version(), runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }

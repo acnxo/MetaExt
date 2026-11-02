@@ -77,7 +77,7 @@ infra/                  配置、日志、存储等基础设施实现与装配
 | 包 | 职责 |
 | --- | --- |
 | `component` | 具体外部接口的实现，按品类与渠道分层组织 |
-| `base` | 最底层公共基座（时间口径、标识约定、错误包装），不依赖本项目其他包 |
+| `base` | 最底层公共基座（版本号读取、时间口径、标识约定、错误包装），不依赖本项目其他包 |
 | `model` | 纯数据结构模型，不含网络与存储行为 |
 | `sdk` | 外部服务客户端：请求构造、签名、重试与响应解析 |
 | `ext` | 扩展点契约与注册机制，运行期替换或增补行为 |
@@ -95,14 +95,15 @@ infra/                  配置、日志、存储等基础设施实现与装配
 
 ## 持续集成
 
-仓库内置两个 GitHub Actions 工作流，位于 `.github/workflows/`：
+仓库内置三个 GitHub Actions 工作流，位于 `.github/workflows/`：
 
 | 工作流 | 触发条件 | 内容 |
 | --- | --- | --- |
 | `CICD` | 推送或 PR 到 `main`、`dev`，或手动触发 | `gofmt` 检查、`go vet`、`go build ./...`、`go test -race` 并上传覆盖率报告 |
 | `Release` | 推送 `v*` 标签 | 先跑格式检查、`go vet`、`go test -race`，通过后创建 Release 并自动生成变更说明 |
+| `AutoTag` | 推送到 `main`，或手动触发 | 读取根目录 `VERSION` 并补 `v` 前缀打标签，创建 Release；标签已存在时跳过 |
 
-工作流文件为 `.github/workflows/CICD.yml` 与 `.github/workflows/Release.yml`。CI 使用的
+工作流文件为 `.github/workflows/CICD.yml`、`Release.yml` 与 `AutoTag.yml`。CI 使用的
 Go 版本从 `go.mod` 读取，不另外固定；覆盖率汇总会写入 Actions 的运行摘要。
 
 ## 许可
