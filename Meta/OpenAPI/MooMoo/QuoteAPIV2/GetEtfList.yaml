@@ -1,0 +1,430 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-etf-list
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-etf-list` 的 HTTP 规格：按板块获取 ETF 列表，
+    默认按资产规模（AUM）降序，支持分页。
+
+    与其他列表接口的差异：
+
+    - 页码从 **0** 开始（0 即第 1 页）；
+    - `leverage` 即使为空也必须以**空串**参与签名，省略该键会导致 -403；
+    - 各参数都有服务端默认值，实现中缺省时显式补默认值；
+    - 条目结构与股票列表一致，本文件内自带一份 schema，便于单独使用。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: EtfList
+    description: ETF 列表
+
+paths:
+  /quote-api/quote-v2/get-etf-list:
+    get:
+      tags:
+        - EtfList
+      operationId: getEtfList
+      summary: 按板块拉取 ETF 列表
+      description: |
+        返回指定板块下的 ETF 列表，默认按资产规模降序并分页。列表顺序由服务端决定，
+        调用方如需其它顺序应自行排序。
+      parameters:
+        - name: routeType
+          in: query
+          required: false
+          description: 站点路由类型，缺省时补默认值 "1"。
+          schema:
+            type: string
+            default: "1"
+          example: "1"
+        - name: plateId
+          in: query
+          required: false
+          description: |
+            板块 ID，缺省时补默认值 "10002799"（美股全部 ETF）。港股全部 ETF 观测为
+            "900075"。
+          schema:
+            type: string
+            default: "10002799"
+          example: "10002799"
+        - name: rankType
+          in: query
+          required: false
+          description: 排行类型，缺省时补默认值 "6"（按 AUM 降序）。
+          schema:
+            type: string
+            default: "6"
+          example: "6"
+        - name: leverage
+          in: query
+          required: false
+          description: |
+            杠杆筛选。即使为空也必须作为空串参与签名，**不能省略该键**：
+            省略会导致签名不匹配，服务端返回 -403。
+          schema:
+            type: string
+            default: ""
+          example: ""
+        - name: page
+          in: query
+          required: false
+          description: |
+            页码，从 **0** 开始（0 即第 1 页）。缺省时补默认值 "0"。
+          schema:
+            type: string
+            default: "0"
+            pattern: '^[0-9]+$'
+          example: "0"
+        - name: pageSize
+          in: query
+          required: false
+          description: 每页数量，缺省时补默认值 "50"。
+          schema:
+            type: string
+            default: "50"
+            pattern: '^[1-9][0-9]*$'
+          example: "50"
+        - name: "_"
+          in: query
+          required: false
+          description: 毫秒级 UNIX 时间戳。缺省时整键省略。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1789943966621"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            CSRF 标记。该接口观测到不校验其取值，但按既有约定仍需携带，
+            且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议带上站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化；leverage 的空串也要写入。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"routeType":"1","plateId":"10002799","rankType":"6","leverage":"","page":"0","pageSize":"50","_":"1789943966621"}'
+          token: "217d908009"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，分页信息在 data.pagination，条目在 data.list；
+            - `-403`：签名被拒（常见原因是省略了 leverage 键）；
+            - `500`：参数错误，服务端消息通常为 Params Error；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtfListResponse"
+              examples:
+                success:
+                  summary: 成功返回一条美股 ETF
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      pagination:
+                        page: 0
+                        pageSize: 50
+                        pageCount: 122
+                        total: 6097
+                      list:
+                        - stockId: 202861
+                          name: 整体股市指数ETF-Vanguard
+                          stockCode: VTI
+                          marketLabel: US
+                          instrumentType: 4
+                          changeRatio: "+0.02%"
+                          priceDirect: up
+                          change: "+0.090"
+                          priceNominal: "375.430"
+                          tradeTrunover: 8.59亿
+                          tradeVolumn: 229.14万
+                          marketVal: 6917.55亿
+                          circulationMarketValue: 6917.55亿
+                          totalShares: 18.43亿
+                          circulationTotalShares: 18.43亿
+                          c_5Days: "-0.23%"
+                          c_5Days_priceDirect: down
+                          c_10Days: "-1.44%"
+                          c_10Days_priceDirect: down
+                          c_20Days: "-0.31%"
+                          c_20Days_priceDirect: down
+                          c_60Days: "+3.54%"
+                          c_60Days_priceDirect: up
+                          c_120Days: "+20.26%"
+                          c_120Days_priceDirect: up
+                          c_250Days: "+15.64%"
+                          c_250Days_priceDirect: up
+                          c_YearDays: "+12.65%"
+                          c_YearDays_priceDirect: up
+                          trustAum: 2.34万亿
+                          leverage: "1"
+                          tradeChangeraio: "0.12%"
+                          priceAmplitude: "0.58%"
+                          volumnRatio: "0.81"
+                          buysellRatio: "-50.00%"
+                tokenRejected:
+                  summary: 省略 leverage 键导致签名不匹配
+                  value:
+                    code: -403
+                    message: 非法请求
+                    data: null
+
+components:
+  schemas:
+    EtfListResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/EtfListData"
+          description: 业务数据，失败时可能为 null。
+
+    EtfListData:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        list:
+          type: array
+          description: 当前页的 ETF 条目，顺序由服务端决定。
+          items:
+            $ref: "#/components/schemas/StockListItem"
+
+    Pagination:
+      type: object
+      description: 分页元信息。本接口页码从 0 开始。
+      properties:
+        page:
+          type: integer
+          description: 当前页码，从 0 开始。
+          example: 0
+        pageSize:
+          type: integer
+          description: 每页数量。
+          example: 50
+        pageCount:
+          type: integer
+          description: 总页数。
+          example: 122
+        total:
+          type: integer
+          description: 总条数，随行情变化。
+          example: 6097
+
+    StockListItem:
+      type: object
+      description: |
+        ETF 条目，结构与股票列表一致。行情类字段为带单位或百分号的字符串，
+        统一按字符串保留；本接口中 instrumentType 为 4（ETF），leverage 通常为字符串
+        （如 "1"），trustAum 为规模排序依据。
+      required:
+        - stockId
+      properties:
+        stockId:
+          type: integer
+          format: int64
+          description: 标的编号。
+          example: 202861
+        name:
+          type: string
+          description: 名称。
+          example: 整体股市指数ETF-Vanguard
+        stockCode:
+          type: string
+          description: 代码。
+          example: VTI
+        marketLabel:
+          type: string
+          description: 市场标识。
+          example: US
+        instrumentType:
+          type: integer
+          description: 标的类型编号，ETF 为 4。
+          example: 4
+        changeRatio:
+          type: string
+          description: 涨跌幅，含百分号。
+          example: "+0.02%"
+        priceDirect:
+          type: string
+          description: 价格方向，如 up、down。
+          example: up
+        change:
+          type: string
+          description: 涨跌额。
+          example: "+0.090"
+        priceNominal:
+          type: string
+          description: 最新价。
+          example: "375.430"
+        tradeTrunover:
+          type: string
+          description: 成交额，带单位。
+          example: 8.59亿
+        tradeVolumn:
+          type: string
+          description: 成交量，带单位。
+          example: 229.14万
+        marketVal:
+          type: string
+          description: 总市值，带单位。
+          example: 6917.55亿
+        circulationMarketValue:
+          type: string
+          description: 流通市值，带单位。
+          example: 6917.55亿
+        totalShares:
+          type: string
+          description: 总股本，带单位。
+          example: 18.43亿
+        circulationTotalShares:
+          type: string
+          description: 流通股本，带单位。
+          example: 18.43亿
+        c_5Days:
+          type: string
+          description: 5 日涨跌幅，含百分号。
+          example: "-0.23%"
+        c_5Days_priceDirect:
+          type: string
+          description: 5 日价格方向。
+          example: down
+        c_10Days:
+          type: string
+          description: 10 日涨跌幅，含百分号。
+          example: "-1.44%"
+        c_10Days_priceDirect:
+          type: string
+          description: 10 日价格方向。
+          example: down
+        c_20Days:
+          type: string
+          description: 20 日涨跌幅，含百分号。
+          example: "-0.31%"
+        c_20Days_priceDirect:
+          type: string
+          description: 20 日价格方向。
+          example: down
+        c_60Days:
+          type: string
+          description: 60 日涨跌幅，含百分号。
+          example: "+3.54%"
+        c_60Days_priceDirect:
+          type: string
+          description: 60 日价格方向。
+          example: up
+        c_120Days:
+          type: string
+          description: 120 日涨跌幅，含百分号。
+          example: "+20.26%"
+        c_120Days_priceDirect:
+          type: string
+          description: 120 日价格方向。
+          example: up
+        c_250Days:
+          type: string
+          description: 250 日涨跌幅，含百分号。
+          example: "+15.64%"
+        c_250Days_priceDirect:
+          type: string
+          description: 250 日价格方向。
+          example: up
+        c_YearDays:
+          type: string
+          description: 一年涨跌幅，含百分号。
+          example: "+12.65%"
+        c_YearDays_priceDirect:
+          type: string
+          description: 一年价格方向。
+          example: up
+        trustAum:
+          type: string
+          description: 资产规模，带单位，也是本接口的默认排序依据。
+          example: 2.34万亿
+        leverage:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 杠杆筛选结果，本接口通常为字符串，如 "1"。
+        tradeChangeraio:
+          type: string
+          description: 换手率，含百分号。
+          example: "0.12%"
+        priceAmplitude:
+          type: string
+          description: 振幅，含百分号。
+          example: "0.58%"
+        volumnRatio:
+          type: string
+          description: 量比。
+          example: "0.81"
+        buysellRatio:
+          type: string
+          description: 买卖盘比例，含百分号，可能为负。
+          example: "-50.00%"
+
+    FlexNumber:
+      description: |
+        可能是数值，也可能以字符串形式给出，缺失时为 null。
+        以字符串形式承载可以避免浮点精度损失。
+      oneOf:
+        - type: string
+        - type: number
+        - type: "null"

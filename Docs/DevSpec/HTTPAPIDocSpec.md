@@ -19,8 +19,9 @@ component/<品类>/<渠道>/<接口组>/
 └── signature_test.go
 ```
 
-- 一个接口组的公共部分（`Config`、`Client`、错误类型）放在 `client.go`；
-- 签名、加密等可独立测试的计算放独立文件，`client.go` 只保留调用；
+- 一个接口一个源文件：公共部分放 `client.go`，每个接口的请求参数、返回结构与解析放在
+  以接口命名的文件（如 `kline.go`、`stocklist.go`），签名等可独立测试的计算放
+  `signature.go`；
 - 包注释写在主文件 `client.go` 上，说明本包职责、必须遵守的协议约束与命名约定。
 
 ## 二、命名
@@ -46,7 +47,9 @@ component/<品类>/<渠道>/<接口组>/
 // Config 零值代表协议默认值，可按需覆盖。
 type Config struct {
     BaseURL    string           // 站点，默认值见 DefaultBaseURL
-    Path       string           // 接口路径，默认值见 DefaultXxxPath
+    // 每个接口一个路径字段，默认值见各自 DefaultXxxPath，便于同一客户端调多个接口。
+    KLinePath     string
+    StockListPath string
     Timeout    time.Duration    // 单次请求超时
     HTTPClient *http.Client     // 可注入，测试与代理场景使用
     Now        func() time.Time // 可注入时钟，便于断言时间戳与签名
@@ -68,7 +71,11 @@ func (c *Client) Config() Config // 返回补齐默认值后的生效配置
   它们会重排键序，破坏依赖键序的签名；
 - 参数值一律先字符串化为 `string` 再参与签名与拼接；
 - 可空业务字段用「为空则取默认值」的写法，并在注释中说明默认取什么；
-- 需要对调用方输入做最小校验（如必填字段为空时直接返回错误，不发请求）。
+- 可省参数缺省时整键省略，不要用空串占位；若服务端对缺键报错，则在代码里显式补默认值；
+- 带请求体的接口由代码一次构造出最终字节：紧凑、键序固定、类型不改，
+  签名与发送使用同一份字节，不得签完再序列化；
+- POST 需额外设置 `content-type: application/json` 与 `origin`；
+- 需要对调用方输入做最小校验（如必填字段为空、分页参数越界时直接返回错误，不发请求）。
 
 ## 五、签名
 
@@ -86,8 +93,10 @@ func (c *Client) Config() Config // 返回补齐默认值后的生效配置
 - 对外暴露的结构体保留原值语义：
   - 价格、金额这类对精度敏感的字段用 `string` 承载，不在解析阶段转浮点；
   - 可能为 `null` 的字段用指针，区分「缺失」与「零值」；
-- 接口字段类型混用（同字段有时是字符串、有时是数字）时，定义 `flexNum` 这类类型实现
+- 接口字段类型混用（同字段有时是字符串、有时是数字）时，定义 `FlexNum` 这类类型实现
   `json.UnmarshalJSON` 兼容多种写法，并让非法值回落到明确的默认值；
+- 以 ID 为键的对象用 `map[string]T` 承接：空对象 `{}` 表示无数据而非错误，
+  `null` 统一归一为空表，调用方按请求的 ID 逐个查表；
 - 响应体读取要设上限（如 `io.LimitReader`，64MB），避免异常响应把内存打满。
 
 ## 七、错误处理
