@@ -1,16 +1,16 @@
-# TradeCalendar 接口规格（占位）
+# Sina TradeCalendar 接口规格
 
-本目录预留给新浪财经 A 股交易日历接口的规格说明，目前只有占位，尚未编写 OpenAPI 规格
-与接口说明。等实测确认响应格式后再补 `GetTradeCalendar.yaml` 与 `GetTradeCalendar.md`。
+新浪财经 A 股交易日历的接口规格与说明。数据源是一个静态文本资源，返回站点自定义
+编码的日期序列，需要解码后才能得到交易日。
 
 ## 文件
 
 | 文件 | 位置 | 说明 |
 | --- | --- | --- |
-| `GetTradeCalendar.yaml` | `Meta/OpenAPI/Sina/TradeCalendar/` | 占位规格骨架，合法 OpenAPI 3.0.3，内容待实测补全 |
-| `GetTradeCalendar.md` | 本目录 | 同一接口的占位说明，记录已知情况与待确认项 |
+| `GetTradeCalendar.yaml` | `Meta/OpenAPI/Sina/TradeCalendar/` | `GET /realstock/company/klc_td_sh.txt` 的 OpenAPI 规格 |
+| `GetTradeCalendar.md` | 本目录 | 同一接口的可读说明，含解码步骤与数据特征 |
 
-两份文件均标为占位，不含未经验证的参数、字段与示例。
+两份文件同名成对：`Meta/` 放机器可读规格，`Docs/` 放人读说明。
 
 ## 接口
 
@@ -19,38 +19,53 @@
 | 方法 | `GET` |
 | 站点 | `https://finance.sina.com.cn` |
 | 路径 | `/realstock/company/klc_td_sh.txt` |
+| operationId | `getTradeCalendar` |
+| 代码入口 | `tradecalendar.Client.GetTradeCalendar` |
 | 响应类型 | `text/plain`（非 JSON） |
-| 建议方法名 | `GetTradeCalendar`（对应代码包 `sdk/sina/tradecalendar`） |
 
-## 已确认的事实
+## 格式要点
 
-对接口请求过一次，只记录可复核的客观现象：
+响应体形如：
 
-- HTTP 状态 200，`content-type: text/plain`，`cache-control: max-age=120`；
-- 响应体很小（约 500 字节），形如 `var datelist="...";var KLC_TD_SH=datelist;`；
-- 引号内是站点自定义编码的字符串，内容不是明文日期，需要解码后才能得到日期序列；
-- 响应头带 `last-modified`，说明该文件由站点定期生成，更新时间不确定。
+```javascript
+var datelist="LC/AAApNDXCw6mHbaPgkryxXv10eAJP1LW0SD39...";var KLC_TD_SH=datelist;
+```
 
-## 待确认
+- 引号内是 469 个字符的编码串，不是明文日期；
+- 每个字符按 Base64 字符表映射为 6 位，低位在前串成位流；
+- 位流依次是：12 位 + 6 位头部（含校验和）、两个 18 位游标、若干游程段；
+- 游程段描述连续交易日区间，用变长的符号位调整游程长度；
+- 日期基准是 `1970-01-01 + 7657 天`，即 1990-12-19（上交所开市日）。
 
-| 项 | 状态 |
+完整解码步骤见 [GetTradeCalendar.md](GetTradeCalendar.md)。
+
+## 数据特征（实测）
+
+| 项 | 值 |
 | --- | --- |
-| 解码算法（编码方式、是否差分编码、边界处理） | 未确认 |
-| 请求头是否必须带 `referer` / `user-agent` | 未确认 |
-| 日期覆盖范围（起始日期、是否含未来交易日） | 未确认 |
-| 文件更新频率与失效时的表现 | 未确认 |
-| 是否存在其它等价接口 | 未确认 |
+| 交易日数量 | 8796 |
+| 日期范围 | 1990-12-19 至 2026-12-31 |
+| 缓存策略 | `cache-control: max-age=120`，`last-modified` 指示生成时间 |
+| 已知缺口 | 1992-05-04 未收录，代码不擅自补 |
 
-## 实现前的准备
+## 实现与测试
 
-1. 实测抓取一次样本，确认编码格式与解码步骤；
-2. 按 `Docs/DevSpec/HTTPAPIDocSpec.md` 补全 `Meta/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml`
-   与本目录下的 `GetTradeCalendar.md`，两者同名；
-3. 在 `sdk/sina/tradecalendar` 中实现客户端，解析逻辑单独成文件，便于数据源替换；
-4. 用 `httptest` 覆盖正常解析、格式异常、非 200、上下文取消与空结果；
-5. 结果建议做缓存（站点侧 `max-age` 为 120 秒，全量日期不常变）。
+`sdk/sina/tradecalendar` 包，纯标准库，文件职责：
+
+| 文件 | 职责 |
+| --- | --- |
+| `client.go` | 配置、HTTP 请求、`APIError` 与 `ErrNoData` |
+| `decode.go` | 编码串提取、位流读取、日期还原 |
+| `calendar.go` | `TradeCalendar` 与 `IsTradeDay` 等查询方法 |
+| `decode_test.go` | 真实样本解析、校验和、截断、边界游标 |
+| `client_test.go` | 请求头、非 200、网络错误、上下文取消、读取失败 |
+| `calendar_test.go` | 空日历、首尾日期、时区语义 |
+
+单包覆盖率 100%，测试不依赖网络：样本是抓取到的真实文本，内嵌在测试中。
 
 ## 风险
 
-- 该资源不是厂商文档化的 API，格式可能随时变化；
-- 解析失败必须返回明确错误，不能用空列表或零值日期兜底，否则调用方难以发现数据源已失效。
+- 该资源不是厂商文档化的 API，编码格式可能随站点调整；
+- 校验和不匹配、数据提前结束时直接报错，不返回部分结果；
+- 数据源存在缺口（如 1992-05-04），需要补数据时由调用方自行处理；
+- 站点按 `max-age=120` 缓存，调用方如需长期持有日历，建议自行加缓存并定期刷新。

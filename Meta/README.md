@@ -21,7 +21,7 @@ Meta/OpenAPI/
 ├── MooMoo/QuoteAPIV2/GetFuturesList.yaml   # 期货合约列表
 ├── MooMoo/QuoteAPIV2/GetHistoryCashTrend.yaml  # 历史资金流水
 ├── MooMoo/QuoteAPIV2/GetQuoteMinute.yaml   # 分钟级分时行情
-└── Sina/TradeCalendar/GetTradeCalendar.yaml  # 交易日历（占位）
+└── Sina/TradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
 ```
 
 ## 与 Docs 的分工
