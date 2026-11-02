@@ -1,6 +1,7 @@
 package cnatradecalendar
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -49,6 +50,9 @@ func TestTradeCalendarWeeklyLayout(t *testing.T) {
 	blank := strings.Repeat(" ", layoutWidth)
 	for i, monday := range weeks {
 		row := rows[monday]
+		// 行首标注 ISO 周编号，年 4 位、周 2 位左补零，便于逐行定位。
+		year, week := monday.ISOWeek()
+		sb.WriteString(fmt.Sprintf("Y%dW%02d  ", year, week))
 		for col := 0; col < 5; col++ {
 			if col > 0 {
 				sb.WriteString("  ")
