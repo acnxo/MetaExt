@@ -1,6 +1,7 @@
 # GetKLine
 
-拉取指定标的的全量 K 线数据，对应 OpenAPI 描述见同目录的 [GetKLine.yaml](GetKLine.yaml)。
+拉取指定标的的全量 K 线数据，对应的 OpenAPI 规格保存在
+[Meta/OpenAPI/MooMoo/QuoteAPIV2/GetKLine.yaml](../../../../Meta/OpenAPI/MooMoo/QuoteAPIV2/GetKLine.yaml)。
 
 ## 接口
 
@@ -49,6 +50,9 @@
 `GET` 请求，无请求体。
 
 ## 签名规则
+
+完整的算法说明、校验向量与排查步骤见 [Signature.md](Signature.md)，本节只给出与本次请求
+相关的要点。
 
 `quote-token` 由全部查询参数决定，分四步：
 
