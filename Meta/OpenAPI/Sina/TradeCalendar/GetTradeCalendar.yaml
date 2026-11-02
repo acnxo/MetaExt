@@ -1,23 +1,21 @@
 openapi: 3.0.3
 
-# 占位规格：字段与响应尚未实测确认，不要据此实现或对接。
-x-status: placeholder
-
 info:
-  title: sina A 股交易日历（占位）
-  version: 0.0.0
+  title: sina A 股交易日历
+  version: 1.0.0
   description: |
-    **占位规格，尚未完成实测确认。**
+    记录 `GET /realstock/company/klc_td_sh.txt` 的 HTTP 规格：从站点静态文本资源
+    获取 A 股交易日历。
 
-    已知信息：
+    该资源返回一段 JS 变量声明，不是 JSON，也不是明文日期列表：
 
-    - 接口为 `GET /realstock/company/klc_td_sh.txt`，响应类型为 `text/plain`；
-    - 响应体形如 `var datelist="...";var KLC_TD_SH=datelist;`，引号内是站点自定义
-      编码的日期序列，需要先解码才能得到交易日列表；
-    - 请求头要求、日期覆盖范围、错误响应形态、文件更新频率均未确认。
+    ```
+    var datelist="<编码串>";var KLC_TD_SH=datelist;
+    ```
 
-    格式确认后需要补全：请求头参数、响应结构与示例、解码说明、异常响应定义，
-    并把 `x-status` 去掉。
+    编码串按 Base64 字符表映射为 6 位一组，内含头部校验和、起止游标与游程压缩的
+    日期序列，需按固定算法解码。解码后的日期范围与数据源同步，实测为
+    1990-12-19 至 2026-12-31，共 8796 个交易日。
 
 servers:
   - url: https://finance.sina.com.cn
@@ -25,7 +23,7 @@ servers:
 
 tags:
   - name: TradeCalendar
-    description: 交易日历
+    description: A 股交易日历
 
 paths:
   /realstock/company/klc_td_sh.txt:
@@ -33,22 +31,81 @@ paths:
       tags:
         - TradeCalendar
       operationId: getTradeCalendar
-      summary: 获取 A 股交易日历（待确认）
+      summary: 获取 A 股交易日历
       description: |
-        返回一段 JS 变量赋值文本，引号内为自定义编码的日期序列，不是 JSON，
-        也不是明文日期列表。解码方式待实测确认。
+        返回静态文本资源，内容为 `var datelist="...";var KLC_TD_SH=datelist;`，
+        引号内为编码后的日期序列。无查询参数、无请求体、无接口级签名。
+      parameters:
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，建议带上，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议带上站点页面地址。
+          schema:
+            type: string
+            default: https://finance.sina.com.cn/
+        - name: accept
+          in: header
+          required: false
+          description: 期望的响应类型。
+          schema:
+            type: string
+            default: text/plain,*/*
       responses:
         "200":
           description: |
-            待确认。当前观察到的情况是 `content-type: text/plain`，响应体约 500 字节，
-            形如 `var datelist="...";var KLC_TD_SH=datelist;`。
+            返回交易日历文本。业务上没有业务码字段，HTTP 200 且能解析出 datelist
+            才视为成功；解析失败（缺少变量、编码非法、校验和不匹配）由调用方报错。
+          headers:
+            content-type:
+              description: 固定为 text/plain。
+              schema:
+                type: string
+                default: text/plain
+            cache-control:
+              description: 站点缓存策略，实测为 max-age=120。
+              schema:
+                type: string
+                example: max-age=120
+            last-modified:
+              description: 资源生成时间，说明该文件由站点定期生成。
+              schema:
+                type: string
           content:
             text/plain:
               schema:
                 type: string
-              example: 'var datelist="...";var KLC_TD_SH=datelist;'
-      x-todo:
-        - 确认解码算法与日期边界处理
-        - 确认是否需要 referer、user-agent 等请求头
-        - 确认日期覆盖范围与是否含未来交易日
-        - 确认非 200 与格式异常时的响应形态
+                description: |
+                  形如 `var datelist="...";var KLC_TD_SH=datelist;` 的文本，
+                  引号内是编码后的日期序列。
+              example: 'var datelist="LC/AAApNDXC...";var KLC_TD_SH=datelist;'
+        "403":
+          description: 被站点拒绝，常见原因是 UA 或来源缺失。
+          content:
+            text/plain:
+              schema:
+                type: string
+        "5XX":
+          description: 站点异常，响应体不是交易日历文本。
+          content:
+            text/plain:
+              schema:
+                type: string
+      x-decoding:
+        summary: 编码串的解码步骤
+        reference: Docs/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.md
+        steps:
+          - 取引号内字符串，按 Base64 字符表把每个字符映射为 6 位值，低位在前串成位流。
+          - 读 12 位与 6 位作为头部；第二个字段与 63 异或得到校验和，只接受 0 或 1。
+          - 读两个 18 位整数，分别作为起始游标与结束游标。
+          - 游标逐日推进，遇到周末折叠到周一；每段先读 1 位标志，为 1 时再读变长
+            符号位调整游程长度，随后按游程长度 ×3 位读入本段的重复天数。
+          - 基准日期为 1970-01-01 加上 7657 天，即 1990-12-19（上交所开市日）。
+        checksumExample:
+          input: "取编码串前 3 个字符 LC/"
+          checksum: 0
