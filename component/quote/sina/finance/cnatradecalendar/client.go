@@ -17,7 +17,7 @@
 //
 // 该资源不是厂商文档化的 API，格式与编码可能随站点调整；解码算法的校验和不匹配
 // 或数据提前结束时会直接报错，避免把损坏数据当成有效日历使用。
-package tradecalendar
+package cnatradecalendar
 
 import (
 	"context"

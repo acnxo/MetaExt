@@ -1,4 +1,4 @@
-package tradecalendar
+package cnatradecalendar
 
 import (
 	"errors"

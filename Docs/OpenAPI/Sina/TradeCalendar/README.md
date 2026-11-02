@@ -20,7 +20,7 @@
 | 站点 | `https://finance.sina.com.cn` |
 | 路径 | `/realstock/company/klc_td_sh.txt` |
 | operationId | `getTradeCalendar` |
-| 代码入口 | `tradecalendar.Client.GetTradeCalendar` |
+| 代码入口 | `cnatradecalendar.Client.GetTradeCalendar` |
 | 响应类型 | `text/plain`（非 JSON） |
 
 ## 格式要点
@@ -50,7 +50,7 @@ var datelist="LC/AAApNDXCw6mHbaPgkryxXv10eAJP1LW0SD39...";var KLC_TD_SH=datelist
 
 ## 实现与测试
 
-`sdk/sina/tradecalendar` 包，纯标准库，文件职责：
+`component/quote/sina/finance/cnatradecalendar` 包，纯标准库，文件职责：
 
 | 文件 | 职责 |
 | --- | --- |

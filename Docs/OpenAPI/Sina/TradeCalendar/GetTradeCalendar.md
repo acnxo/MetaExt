@@ -12,7 +12,7 @@
 | 站点 | `https://finance.sina.com.cn` |
 | 路径 | `/realstock/company/klc_td_sh.txt` |
 | operationId | `getTradeCalendar` |
-| 代码入口 | `tradecalendar.Client.GetTradeCalendar`（`sdk/sina/tradecalendar` 包） |
+| 代码入口 | `cnatradecalendar.Client.GetTradeCalendar`（`component/quote/sina/finance/cnatradecalendar` 包） |
 | 备注 | 静态文本资源，非 JSON；无查询参数、无请求体、无接口级签名。 |
 
 ## 请求参数
