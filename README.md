@@ -2,9 +2,6 @@
 
 Meta External Impl —— 外部数据接口的 Go 实现集合。
 
-当前已实现 moomoo（富途）网页行情接口 `/quote-api/quote-v2/*` 的客户端封装：按网页端的
-签名规则生成 `quote-token`，拉取 K 线数据并转换为统一结构。
-
 ## 环境要求
 
 - Go 1.25 及以上
@@ -29,10 +26,7 @@ go build -ldflags "-X main.version=v0.1.0" -o MetaExt ./cmd/starter
 ```
 cmd/
 └── starter/            程序入口
-component/              按「品类 → 渠道」组织的接口实现
-└── quote/
-    └── moomoo/
-        └── quoteapiv2/ moomoo quote-v2 客户端（含签名、K 线）
+component/              具体外部接口的实现，按品类与渠道分层组织
 base/                   最底层公共基座，不依赖本项目其他包
 model/                  跨层共享的数据模型
 sdk/                    外部服务客户端封装
@@ -55,25 +49,12 @@ infra/                  配置、日志、存储等基础设施实现与装配
 | `common` | 公共常量、枚举与轻量值对象 |
 | `infra` | 配置、日志、存储、缓存等实现，仅由入口层装配引用 |
 
-## 已实现接口
+## 扩展新的接口实现
 
-### moomoo quote-v2 K 线
-
-```go
-client := quoteapiv2.New(quoteapiv2.Config{})
-bars, err := client.Kline(ctx, quoteapiv2.KlineRequest{
-    StockID:           "1234",
-    MarketType:        "1",
-    MarketCode:        "1",
-    InstrumentType:    "3",
-    SubInstrumentType: "0",
-})
-```
-
-- 五个定位参数原样透传，不做语义换算
-- 接口一次返回全部历史数据、无分页，结果按时间升序
-- 价格保留原始字符串，避免浮点精度损失
-- 错误按 HTTP 状态与业务码分类，可用 `IsTokenRejected` 判断签名被拒
+1. 在 `component/` 下按「品类 → 渠道」新建包，或在 `sdk/` 下按外部服务新建包；
+2. 只做协议适配：请求构造、签名、重试与响应解析，把外部格式转换为 `model` 中的结构；
+3. 错误按 HTTP 状态与业务码分类，并提供可判定的错误类型；
+4. 不承载业务流程，也不直接访问存储。
 
 ## 许可
 
