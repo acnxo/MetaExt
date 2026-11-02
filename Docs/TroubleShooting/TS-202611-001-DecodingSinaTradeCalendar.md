@@ -206,4 +206,4 @@ Invalid base64-encoded string: number of data characters (469) cannot be
 - 已知缺口：数据源本身缺 `1992-05-04`，实现不擅自补，文档如实标注。
 
 相关实现：`component/quote/sina/finance/cnatradecalendar`；接口说明见
-`Docs/OpenAPI/Sina/` 下该接口的 `GetTradeCalendar.md`。
+[GetTradeCalendar.md](../OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.md)。
