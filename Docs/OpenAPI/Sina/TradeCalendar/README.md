@@ -3,6 +3,15 @@
 本目录预留给新浪财经 A 股交易日历接口的规格说明，目前只有占位，尚未编写 OpenAPI 规格
 与接口说明。等实测确认响应格式后再补 `GetTradeCalendar.yaml` 与 `GetTradeCalendar.md`。
 
+## 文件
+
+| 文件 | 位置 | 说明 |
+| --- | --- | --- |
+| `GetTradeCalendar.yaml` | `Meta/OpenAPI/Sina/TradeCalendar/` | 占位规格骨架，合法 OpenAPI 3.0.3，内容待实测补全 |
+| `GetTradeCalendar.md` | 本目录 | 同一接口的占位说明，记录已知情况与待确认项 |
+
+两份文件均标为占位，不含未经验证的参数、字段与示例。
+
 ## 接口
 
 | 项 | 内容 |
@@ -35,7 +44,7 @@
 ## 实现前的准备
 
 1. 实测抓取一次样本，确认编码格式与解码步骤；
-2. 按 `Docs/DevSpec/HTTPAPIDocSpec.md` 编写 `Meta/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml`
+2. 按 `Docs/DevSpec/HTTPAPIDocSpec.md` 补全 `Meta/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml`
    与本目录下的 `GetTradeCalendar.md`，两者同名；
 3. 在 `sdk/sina/tradecalendar` 中实现客户端，解析逻辑单独成文件，便于数据源替换；
 4. 用 `httptest` 覆盖正常解析、格式异常、非 200、上下文取消与空结果；
