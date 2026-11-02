@@ -1,15 +1,15 @@
 openapi: 3.0.3
 
 info:
-  title: moomoo 网页行情接口（quote-v2）
+  title: moomoo 行情接口 get-kline
   version: 1.0.0
   description: |
-    记录 moomoo（富途）网页端行情接口 /quote-api/quote-v2/* 的 HTTP 规格，
-    依据网页端实际发出的请求与返回的响应整理，用于对照 Go 侧实现与联调排查。
+    记录 `GET /quote-api/quote-v2/get-kline` 的 HTTP 规格，依据网页端实际发出的
+    请求与返回的响应整理，用于对照 Go 侧实现与联调排查。
 
     约定：
 
-    - 鉴权不依赖登录态，而是请求头 quote-token 携带的签名，签名规则见各操作的
+    - 鉴权不依赖登录态，而是请求头 quote-token 携带的签名，签名规则见本操作的
       x-signature 扩展字段；
     - HTTP 状态码只表示传输层结果，业务结果一律看响应体的 code 字段；
     - 查询参数的书写顺序即签名输入的键序，调整顺序会导致签名不通过。

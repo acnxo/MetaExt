@@ -1,13 +1,22 @@
 # QuoteAPIV2 接口规格
 
-本目录记录 moomoo（富途）网页端行情接口 `/quote-api/quote-v2/*` 的 HTTP 规格，
-用 OpenAPI 3.0.3 描述每个接口的参数、请求头、响应结构与错误码。
+本目录记录 moomoo（富途）网页端行情接口 `/quote-api/quote-v2/*` 的 HTTP 规格。
+
+每个接口由两个同名文件描述：`.yaml` 是机器可读的 OpenAPI 3.0.3 规格，`.md` 是面向
+人阅读的说明（参数表、签名步骤、响应字段与示例）。
 
 ## 文件
 
 | 文件 | 说明 |
 | --- | --- |
-| `openapi.yaml` | quote-v2 接口规范，当前包含 `GET /quote-api/quote-v2/get-kline` |
+| `GetKLine.yaml` | `GET /quote-api/quote-v2/get-kline` 的 OpenAPI 规格 |
+| `GetKLine.md` | 同一接口的可读说明 |
+
+## 命名约定
+
+- 文件名取接口路径末段的驼峰形式，与 Go 客户端方法名保持一致：
+  `get-kline` → `GetKLine`，对应 `Client.GetKline`；
+- 新增接口时按同一规则成对添加 `.yaml` 与 `.md`。
 
 ## 与代码的对应关系
 
@@ -16,12 +25,12 @@
 - 查询参数在规范中的书写顺序就是签名输入的键序，与代码里的参数构造顺序一致；
 - 响应结构 `KlineResponse` 对应代码中的 `klinePayload`、`KlineItem` 对应 `klineItem`。
 
-新增接口时，先在 `openapi.yaml` 中补上该接口的规格，再按同一命名规则实现客户端方法。
+新增接口时，先补齐规格文档，再按同一命名规则实现客户端方法。
 
 ## 查看与校验
 
-`openapi.yaml` 是标准 OpenAPI 3.0 文档，可用任意兼容 OpenAPI 3.0 的工具预览、
-生成文档或做 lint，例如编辑器插件、Swagger UI、Redoc 一类的查看器。
+`.yaml` 是标准 OpenAPI 3.0 文档，可用任意兼容 OpenAPI 3.0 的工具预览、生成文档或
+做 lint，例如编辑器插件、Swagger UI、Redoc 一类的查看器。
 
 改动后用 YAML 解析即可确认语法，并检查 `$ref` 指向的组件是否存在。
 
