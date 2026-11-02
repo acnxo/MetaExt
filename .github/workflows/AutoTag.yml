@@ -59,6 +59,9 @@ jobs:
             echo "标签 ${TAG} 已存在，跳过，避免重复发布。"
             exit 0
           fi
+          # 打附注 tag 需要提交者身份，Actions 环境默认没有配置，这里显式指定。
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "${TAG}" -m "${TAG}：由 VERSION 文件声明"
           git push origin "${TAG}"
           # 由 GITHUB_TOKEN 推送的标签不会再次触发 Release 工作流，
