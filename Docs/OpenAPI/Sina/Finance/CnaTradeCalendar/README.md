@@ -1,4 +1,4 @@
-# Sina TradeCalendar 接口规格
+# Sina Finance CnaTradeCalendar 接口规格
 
 新浪财经 A 股交易日历的接口规格与说明。数据源是一个静态文本资源，返回站点自定义
 编码的日期序列，需要解码后才能得到交易日。
@@ -7,7 +7,7 @@
 
 | 文件 | 位置 | 说明 |
 | --- | --- | --- |
-| `GetTradeCalendar.yaml` | `Meta/OpenAPI/Sina/TradeCalendar/` | `GET /realstock/company/klc_td_sh.txt` 的 OpenAPI 规格 |
+| `GetTradeCalendar.yaml` | `Meta/OpenAPI/Sina/Finance/CnaTradeCalendar/` | `GET /realstock/company/klc_td_sh.txt` 的 OpenAPI 规格 |
 | `GetTradeCalendar.md` | 本目录 | 同一接口的可读说明，含解码步骤与数据特征 |
 
 两份文件同名成对：`Meta/` 放机器可读规格，`Docs/` 放人读说明。

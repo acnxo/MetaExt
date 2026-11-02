@@ -98,7 +98,7 @@ paths:
                 type: string
       x-decoding:
         summary: 编码串的解码步骤
-        reference: Docs/OpenAPI/Sina/TradeCalendar/GetTradeCalendar.md
+        reference: Docs/OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.md
         steps:
           - 取引号内字符串，按 Base64 字符表把每个字符映射为 6 位值，低位在前串成位流。
           - 读 12 位与 6 位作为头部；第二个字段与 63 异或得到校验和，只接受 0 或 1。
