@@ -154,9 +154,14 @@ func (c *Client) Config() Config // 返回补齐默认值后的生效配置
 | 跨接口说明 | `Docs/OpenAPI/<厂商>/<接口组>/<主题>.md` | 不绑定单个接口的规则，如签名（`Signature.md`） |
 | 目录索引 | `Docs/OpenAPI/<厂商>/<接口组>/README.md` | 文件清单、命名约定、与代码的对应关系 |
 
+代码按「厂商 → 分类 → 接口组」分层时，文档目录同步插入 `<分类>` 一级，
+`<厂商>/[<分类>/]<接口组>` 与 Go 包目录 `component/quote/<厂商>/[<分类>/]<接口组>`
+一一对应。
+
 目录结构示例：
 
 ```
+# 代码 component/quote/moomoo/quoteapiv2，无分类层
 Meta/OpenAPI/MooMoo/QuoteAPIV2/
 └── GetKLine.yaml
 
@@ -164,12 +169,21 @@ Docs/OpenAPI/MooMoo/QuoteAPIV2/
 ├── README.md
 ├── GetKLine.md
 └── Signature.md
+
+# 代码 component/quote/sina/finance/cnatradecalendar，有分类层
+Meta/OpenAPI/Sina/Finance/CnaTradeCalendar/
+└── GetTradeCalendar.yaml
+
+Docs/OpenAPI/Sina/Finance/CnaTradeCalendar/
+├── README.md
+└── GetTradeCalendar.md
 ```
 
 约定：
 
-- `<厂商>` 用来源的稳定名称（如 `MooMoo`），`<接口组>` 用接口路径中的版本或系列名
-  （如 `QuoteAPIV2`），不再拆更深的层级；
+- `<厂商>` 用来源的稳定名称（如 `MooMoo`、`Sina`）；`<分类>` 与 `<接口组>` 取
+  Go 包目录名对应的大驼峰形式（`quoteapiv2` → `QuoteAPIV2`，`cnatradecalendar` →
+  `CnaTradeCalendar`），层级与代码目录保持一致，不额外增加代码中不存在的层级；
 - `<接口名>` 与 Go 方法名、`operationId` 三者一致（如 `GetKLine`），`.yaml` 与 `.md` 同名；
 - 新增接口必须同时提交 `.yaml` 与 `.md`，不能只提交其中一份；
 - 跨接口的公共规则（签名、鉴权、公共响应结构）单独成文放 `Docs/` 侧，
