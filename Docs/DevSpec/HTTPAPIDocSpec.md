@@ -136,7 +136,7 @@ func (c *Client) Config() Config // 返回补齐默认值后的生效配置
 ### 9.1 保存路径
 
 机器可读的规格与人读的说明分开放：规格进 `Meta/`，说明进 `Docs/`，两边目录层级一致、
-文件名一致。
+文件名一致。文件与目录的命名规则见 [`FileNamingSpec.md`](FileNamingSpec.md)。
 
 | 类型 | 路径 | 内容 |
 | --- | --- | --- |
@@ -182,6 +182,9 @@ Docs/OpenAPI/MooMoo/QuoteAPIV2/
 
 ### 9.3 说明内容（md）
 
+排版、标题、表格与链接的写法遵循 [`MarkdownSpec.md`](MarkdownSpec.md)；本节只约束接口说明
+的内容顺序。
+
 按固定小节组织，顺序如下：
 
 1. **接口**：表格列出方法、站点、路径、`operationId`、代码入口、备注（如无分页、无时间范围、
@@ -217,6 +220,9 @@ go vet ./...
 go test ./...
 ```
 
+上述检查在 CI（`.github/workflows/CICD.yml`）中对 `main`、`dev` 的推送与 PR 各跑一遍，
+提交前最好先在本地过一遍。
+
 - [ ] 方法名能看出接口，且与 `operationId` 一致
 - [ ] 请求参数有序构造，值已字符串化
 - [ ] 响应解析保留原始精度，`null` 与零值可区分
@@ -225,3 +231,4 @@ go test ./...
 - [ ] `Meta/OpenAPI/` 下的规格与 `Docs/OpenAPI/` 下的说明同名成对，且与实现一致
 - [ ] `md` 中的相对链接可跳转，引用的代码路径真实存在
 - [ ] 字段表未把多类型挤在一格，精度与承载类型已写明
+- [ ] CI 的格式检查、`go vet`、构建与 `go test` 均通过
