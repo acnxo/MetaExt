@@ -1,0 +1,422 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-stock-list
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-stock-list` 的 HTTP 规格：按市场与板块获取股票
+    列表，支持排行榜排序与分页，返回行情快照与多周期涨跌幅。
+
+    约定：
+
+    - 鉴权为请求头 quote-token 携带的签名，规则见本操作的 x-signature 扩展字段；
+    - HTTP 状态码只表示传输层结果，业务结果一律看响应体的 code 字段；
+    - 查询参数的书写顺序即签名输入的键序；可选参数缺省时整键省略，不要传空串；
+    - 页码从 1 开始，与部分同类接口从 0 起不同。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: StockList
+    description: 板块股票列表
+
+paths:
+  /quote-api/quote-v2/get-stock-list:
+    get:
+      tags:
+        - StockList
+      operationId: getStockList
+      summary: 按市场与板块拉取股票列表
+      description: |
+        返回指定市场、板块下的股票列表，支持排行榜排序与分页。列表顺序由服务端决定，
+        调用方如需其它顺序应自行排序。
+
+        市场类型、板块类型等编号来自行情元数据，属于不同编号体系，必须原样透传，
+        不要做语义换算。
+      parameters:
+        - name: marketType
+          in: query
+          required: true
+          description: 市场类型，必填，原样透传。
+          schema:
+            type: string
+          example: "1"
+        - name: plateType
+          in: query
+          required: false
+          description: |
+            板块类型。缺省时按默认值 "1" 处理；服务端对缺少该键的请求返回 code=500
+            与 Params Error，因此实现中缺省时会显式补上默认值。
+          schema:
+            type: string
+            default: "1"
+          example: "1"
+        - name: rankType
+          in: query
+          required: false
+          description: |
+            排行类型。缺省时整键省略，由服务端决定默认排序；不要传空串。
+          schema:
+            type: string
+          example: "3"
+        - name: page
+          in: query
+          required: false
+          description: |
+            页码，从 1 开始。缺省时整键省略，服务端按第 1 页处理；传 0 属于越界取值。
+          schema:
+            type: string
+            pattern: '^[1-9][0-9]*$'
+          example: "1"
+        - name: pageSize
+          in: query
+          required: false
+          description: |
+            每页数量。缺省时整键省略，服务端使用默认值（观测为 50）。
+          schema:
+            type: string
+            pattern: '^[1-9][0-9]*$'
+          example: "50"
+        - name: "_"
+          in: query
+          required: false
+          description: |
+            毫秒级 UNIX 时间戳，用于防缓存并参与签名。缺省时整键省略，不自动补当前时间。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1781611867445"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            CSRF 标记，该接口不校验取值但必须存在，且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，需为站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化，键序不得重排。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对第一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"marketType":"1","plateType":"1","rankType":"3","page":"1","pageSize":"50","_":"1781611867445"}'
+          token: "6481798cf4"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，分页信息在 data.pagination，条目在 data.list；
+            - `-403`：签名被拒；
+            - `500`：参数错误，服务端消息通常为 Params Error；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockListResponse"
+              examples:
+                success:
+                  summary: 成功返回一页数据
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      pagination:
+                        page: 1
+                        pageSize: 50
+                        pageCount: 65
+                        total: 3228
+                      list:
+                        - stockId: 58531814313881
+                          name: 洛阳钼业
+                          stockCode: "03993"
+                          marketLabel: HK
+                          instrumentType: 3
+                          changeRatio: "-4.30%"
+                          priceDirect: down
+                          change: "-0.860"
+                          priceNominal: "19.120"
+                          tradeTrunover: 14.33亿
+                          tradeVolumn: 7408.21万
+                          marketVal: 4090.59亿
+                          circulationMarketValue: 752.08亿
+                          totalShares: 213.94亿
+                          circulationTotalShares: 39.33亿
+                          c_5Days: "+15.18%"
+                          c_5Days_priceDirect: up
+                          c_10Days: "-2.00%"
+                          c_10Days_priceDirect: down
+                          c_20Days: "+6.40%"
+                          c_20Days_priceDirect: up
+                          c_60Days: "+5.03%"
+                          c_60Days_priceDirect: up
+                          c_120Days: "+6.56%"
+                          c_120Days_priceDirect: up
+                          c_250Days: "+206.62%"
+                          c_250Days_priceDirect: up
+                          c_YearDays: "+1.09%"
+                          c_YearDays_priceDirect: up
+                          trustAum: "0.00"
+                          leverage: null
+                          tradeChangeraio: "1.88%"
+                          priceAmplitude: "5.26%"
+                          volumnRatio: "1.09"
+                          buysellRatio: "0.00%"
+                paramsError:
+                  summary: 参数错误
+                  value:
+                    code: 500
+                    message: Params Error
+                    data: null
+
+components:
+  schemas:
+    StockListResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/StockListData"
+          description: 业务数据，失败时可能为 null。
+
+    StockListData:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        list:
+          type: array
+          description: 当前页的股票条目，顺序由服务端决定。
+          items:
+            $ref: "#/components/schemas/StockListItem"
+
+    Pagination:
+      type: object
+      description: 分页元信息，页码从 1 开始。
+      properties:
+        page:
+          type: integer
+          description: 当前页码。
+          example: 1
+        pageSize:
+          type: integer
+          description: 每页数量。
+          example: 50
+        pageCount:
+          type: integer
+          description: 总页数。
+          example: 65
+        total:
+          type: integer
+          description: 总条数，随行情变化。
+          example: 3228
+
+    StockListItem:
+      type: object
+      description: |
+        股票列表条目。行情类字段为带单位或百分号的字符串（如「14.33亿」「-4.30%」），
+        统一按字符串保留，不要在解析阶段转成数值，以免丢失单位与精度。
+        少数接口字段名与常规拼写不一致（tradeTrunover、tradeVolumn、tradeChangeraio），
+        规格中保持原样。
+      required:
+        - stockId
+      properties:
+        stockId:
+          type: integer
+          format: int64
+          description: 标的编号。
+          example: 58531814313881
+        name:
+          type: string
+          description: 名称。
+          example: 洛阳钼业
+        stockCode:
+          type: string
+          description: 代码。
+          example: "03993"
+        marketLabel:
+          type: string
+          description: 市场标识，如 HK。
+          example: HK
+        instrumentType:
+          type: integer
+          description: 标的类型编号，普通股通常为 3。
+          example: 3
+        changeRatio:
+          type: string
+          description: 涨跌幅，含百分号。
+          example: "-4.30%"
+        priceDirect:
+          type: string
+          description: 价格方向，如 up、down。
+          example: down
+        change:
+          type: string
+          description: 涨跌额。
+          example: "-0.860"
+        priceNominal:
+          type: string
+          description: 最新价。
+          example: "19.120"
+        tradeTrunover:
+          type: string
+          description: 成交额，带单位。
+          example: 14.33亿
+        tradeVolumn:
+          type: string
+          description: 成交量，带单位。
+          example: 7408.21万
+        marketVal:
+          type: string
+          description: 总市值，带单位。
+          example: 4090.59亿
+        circulationMarketValue:
+          type: string
+          description: 流通市值，带单位。
+          example: 752.08亿
+        totalShares:
+          type: string
+          description: 总股本，带单位。
+          example: 213.94亿
+        circulationTotalShares:
+          type: string
+          description: 流通股本，带单位。
+          example: 39.33亿
+        c_5Days:
+          type: string
+          description: 5 日涨跌幅，含百分号。
+          example: "+15.18%"
+        c_5Days_priceDirect:
+          type: string
+          description: 5 日价格方向。
+          example: up
+        c_10Days:
+          type: string
+          description: 10 日涨跌幅，含百分号。
+          example: "-2.00%"
+        c_10Days_priceDirect:
+          type: string
+          description: 10 日价格方向。
+          example: down
+        c_20Days:
+          type: string
+          description: 20 日涨跌幅，含百分号。
+          example: "+6.40%"
+        c_20Days_priceDirect:
+          type: string
+          description: 20 日价格方向。
+          example: up
+        c_60Days:
+          type: string
+          description: 60 日涨跌幅，含百分号。
+          example: "+5.03%"
+        c_60Days_priceDirect:
+          type: string
+          description: 60 日价格方向。
+          example: up
+        c_120Days:
+          type: string
+          description: 120 日涨跌幅，含百分号。
+          example: "+6.56%"
+        c_120Days_priceDirect:
+          type: string
+          description: 120 日价格方向。
+          example: up
+        c_250Days:
+          type: string
+          description: 250 日涨跌幅，含百分号。
+          example: "+206.62%"
+        c_250Days_priceDirect:
+          type: string
+          description: 250 日价格方向。
+          example: up
+        c_YearDays:
+          type: string
+          description: 一年涨跌幅，含百分号。
+          example: "+1.09%"
+        c_YearDays_priceDirect:
+          type: string
+          description: 一年价格方向。
+          example: up
+        trustAum:
+          type: string
+          description: 信托资产规模。
+          example: "0.00"
+        leverage:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 杠杆率，可能为 null。
+        tradeChangeraio:
+          type: string
+          description: 换手率，含百分号。
+          example: "1.88%"
+        priceAmplitude:
+          type: string
+          description: 振幅，含百分号。
+          example: "5.26%"
+        volumnRatio:
+          type: string
+          description: 量比。
+          example: "1.09"
+        buysellRatio:
+          type: string
+          description: 买卖盘比例，含百分号。
+          example: "0.00%"
+
+    FlexNumber:
+      description: |
+        可能是数值，也可能以字符串形式给出，缺失时为 null。
+        以字符串形式承载可以避免浮点精度损失。
+      oneOf:
+        - type: string
+        - type: number
+        - type: "null"

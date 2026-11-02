@@ -1,0 +1,241 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-news-list
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-news-list` 的 HTTP 规格：按服务端内部股票 ID
+    获取新闻列表，返回标题、来源、链接与摘要。
+
+    约定：
+
+    - 鉴权为请求头 quote-token 携带的签名，规则见本操作的 x-signature 扩展字段；
+    - 参数命名风格混用：`stock_id`、`market_type` 为 snake_case，`subType` 为 camelCase，
+      必须原样保留，不得做风格统一；
+    - HTTP 状态码只表示传输层结果，业务结果一律看响应体的 code 字段。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: NewsList
+    description: 个股新闻列表
+
+paths:
+  /quote-api/quote-v2/get-news-list:
+    get:
+      tags:
+        - NewsList
+      operationId: getNewsList
+      summary: 获取个股新闻列表
+      description: |
+        按服务端内部股票 ID 返回新闻列表。结果按服务端顺序返回，是否还有更多由
+        has_more 判断。
+
+        响应中的 seq_mark 用于翻页，但翻页时对应的查询参数名尚未实测确认，
+        规格中不定义该参数。
+      parameters:
+        - name: stock_id
+          in: query
+          required: true
+          description: 服务端内部股票 ID，snake_case 命名。
+          schema:
+            type: string
+          example: "76033806042898"
+        - name: market_type
+          in: query
+          required: false
+          description: |
+            市场类型，snake_case 命名。缺省时按默认值 "1" 处理；服务端对缺少该键的请求
+            返回 code=500，因此实现中缺省时会显式补上默认值。
+          schema:
+            type: string
+            default: "1"
+          example: "1"
+        - name: type
+          in: query
+          required: false
+          description: |
+            新闻类型。缺省时按默认值 "0" 处理；服务端对缺少该键的请求返回 code=404，
+            因此实现中缺省时会显式补上默认值。
+          schema:
+            type: string
+            default: "0"
+          example: "0"
+        - name: subType
+          in: query
+          required: false
+          description: |
+            新闻子类型，camelCase 命名（与 stock_id 的 snake_case 风格不同，保持原样）。
+          schema:
+            type: string
+            default: "0"
+          example: "0"
+        - name: "_"
+          in: query
+          required: false
+          description: 毫秒级 UNIX 时间戳。缺省时整键省略，签名输入与 URL 中都不含该键。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1781592384789"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: CSRF 标记，该接口不校验取值但必须存在，且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议传对应的新闻页地址。
+          schema:
+            type: string
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化，键名保持原始命名风格。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对第一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"stock_id":"76033806042898","market_type":"1","type":"0","subType":"0","_":"1781592384789"}'
+          token: "055b0960ec"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，条目在 data.list 中；
+            - `-403`：签名被拒；
+            - `404`：必填参数缺失（如缺少 type）；
+            - `500`：参数错误（如缺少 market_type，或取值不被接受）；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsListResponse"
+              examples:
+                success:
+                  summary: 成功返回一条新闻
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      server_time: 1781592387840
+                      has_more: true
+                      seq_mark: 1_1781537154
+                      list:
+                        - id: news-1
+                          title: 小米集团发布新品
+                          time: 1781537154
+                          source: 新浪财经
+                          url: https://example.com/news/1
+                          summary: 摘要内容
+                paramsMissing:
+                  summary: 缺少 type 参数
+                  value:
+                    code: 404
+                    message: 参数缺失
+                    data: null
+
+components:
+  schemas:
+    NewsListResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/NewsListData"
+          description: 业务数据，失败时可能为 null。
+
+    NewsListData:
+      type: object
+      properties:
+        server_time:
+          type: integer
+          format: int64
+          description: 服务端时间戳，毫秒。
+          example: 1781592387840
+        has_more:
+          type: boolean
+          description: 是否还有更多新闻。
+          example: true
+        seq_mark:
+          type: string
+          description: 分页标记，翻页请求时回传；对应的查询参数名尚未实测确认。
+          example: 1_1781537154
+        list:
+          type: array
+          description: 新闻条目，按服务端顺序返回。
+          items:
+            $ref: "#/components/schemas/NewsListItem"
+
+    NewsListItem:
+      type: object
+      description: 一条新闻。
+      properties:
+        id:
+          type: string
+          description: 新闻唯一 ID。
+          example: news-1
+        title:
+          type: string
+          description: 新闻标题。
+          example: 小米集团发布新品
+        time:
+          type: integer
+          format: int64
+          description: 发布时间戳，秒级 UNIX 时间戳。
+          example: 1781537154
+        source:
+          type: string
+          description: 新闻来源。
+          example: 新浪财经
+        url:
+          type: string
+          description: 新闻详情链接。
+          example: https://example.com/news/1
+        summary:
+          type: string
+          description: 新闻摘要。
+          example: 摘要内容

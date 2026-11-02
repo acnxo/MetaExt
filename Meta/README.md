@@ -13,7 +13,14 @@
 
 ```
 Meta/OpenAPI/
-├── MooMoo/QuoteAPIV2/GetKLine.yaml        # 行情 K 线
+├── MooMoo/QuoteAPIV2/GetKLine.yaml         # 行情 K 线
+├── MooMoo/QuoteAPIV2/GetStockList.yaml     # 板块股票列表
+├── MooMoo/QuoteAPIV2/GetOptionQuote.yaml   # 期权批量报价
+├── MooMoo/QuoteAPIV2/GetNewsList.yaml      # 个股新闻列表
+├── MooMoo/QuoteAPIV2/GetEtfList.yaml       # ETF 列表
+├── MooMoo/QuoteAPIV2/GetFuturesList.yaml   # 期货合约列表
+├── MooMoo/QuoteAPIV2/GetHistoryCashTrend.yaml  # 历史资金流水
+├── MooMoo/QuoteAPIV2/GetQuoteMinute.yaml   # 分钟级分时行情
 └── Sina/TradeCalendar/GetTradeCalendar.yaml  # 交易日历（占位）
 ```
 

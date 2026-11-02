@@ -1,0 +1,302 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-quote-minute
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-quote-minute` 的 HTTP 规格：获取指定标的的
+    分钟级分时数据（价格、成交量、成交额与涨跌），并给出当日交易时段列表。
+
+    注意点：
+
+    - 六个定位参数全部必填，且必须与 `stockId` 匹配，否则服务端返回 500；
+    - `req_section` 是唯一的 snake_case 参数，位置固定在 `subInstrumentType` 之后；
+    - 省略 `req_section` 时返回全天数据，该键不出现在签名输入与 URL 中；
+    - 本接口的 `marketType` 编码与其他接口不同（1 为 A 股、2 为港股），不能跨接口套用。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: QuoteMinute
+    description: 分钟级分时行情
+
+paths:
+  /quote-api/quote-v2/get-quote-minute:
+    get:
+      tags:
+        - QuoteMinute
+      operationId: getQuoteMinute
+      summary: 获取分钟级分时行情
+      description: |
+        返回当日分钟级明细、当日概览（昨收、最高、最低）与交易时段。
+        指定 `req_section` 时只返回该时段的数据。
+      parameters:
+        - name: stockId
+          in: query
+          required: true
+          description: 服务端内部股票 ID。
+          schema:
+            type: string
+          example: "70000294"
+        - name: marketType
+          in: query
+          required: true
+          description: 市场类型。本接口中 1 为 A 股、2 为港股，与其他接口的编码含义不同。
+          schema:
+            type: string
+          example: "2"
+        - name: type
+          in: query
+          required: true
+          description: 行情类型，原样透传。
+          schema:
+            type: string
+          example: "2"
+        - name: marketCode
+          in: query
+          required: true
+          description: 市场代码，原样透传。
+          schema:
+            type: string
+          example: "70"
+        - name: instrumentType
+          in: query
+          required: true
+          description: 证券类型，原样透传。
+          schema:
+            type: string
+          example: "9"
+        - name: subInstrumentType
+          in: query
+          required: true
+          description: 证券子类型，原样透传。
+          schema:
+            type: string
+          example: "9008"
+        - name: req_section
+          in: query
+          required: false
+          description: |
+            请求时段，观测到 1 表示盘中。省略时整键省略，服务端返回全天数据；
+            不要传空串。
+          schema:
+            type: string
+          example: "1"
+        - name: "_"
+          in: query
+          required: false
+          description: 毫秒级 UNIX 时间戳。缺省时整键省略。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1780507278122"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: CSRF 标记，该接口不校验取值但必须存在，且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议带上站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化；req_section 插在 subInstrumentType 之后。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"stockId":"70000294","marketType":"2","type":"2","marketCode":"70","instrumentType":"9","subInstrumentType":"9008","_":"1780507278122"}'
+          token: "45671b44c1"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功；
+            - `-403`：签名被拒；
+            - `500`：参数错误，例如六个定位参数与 stockId 不匹配；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteMinuteResponse"
+              examples:
+                success:
+                  summary: 成功返回一条分时数据
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      stockId: 70000294
+                      server_time: 1780507278500
+                      last_close_price: 45.5
+                      highest_price: 46.8
+                      lowest_price: 45.2
+                      list:
+                        - time: 1780480800
+                          price: 45.6
+                          cc_price: 45.6
+                          volume: 12500
+                          turnover: 570000.0
+                          ratio: "0.22%"
+                          change_price: 0.1
+                      time_section:
+                        - begin: 1780480800
+                          end: 1780491600
+                paramsError:
+                  summary: 定位参数与 stockId 不匹配
+                  value:
+                    code: 500
+                    message: Params Error
+                    data: null
+
+components:
+  schemas:
+    QuoteMinuteResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/QuoteMinuteData"
+          description: 业务数据，失败时可能为 null。
+
+    QuoteMinuteData:
+      type: object
+      properties:
+        stockId:
+          type: integer
+          format: int64
+          description: 证券 ID。
+          example: 70000294
+        server_time:
+          type: integer
+          format: int64
+          description: 服务端时间戳，毫秒。
+          example: 1780507278500
+        last_close_price:
+          type: number
+          format: double
+          description: 昨收价。
+          example: 45.5
+        highest_price:
+          type: number
+          format: double
+          description: 最高价。
+          example: 46.8
+        lowest_price:
+          type: number
+          format: double
+          description: 最低价。
+          example: 45.2
+        list:
+          type: array
+          description: 分钟级分时数据。
+          items:
+            $ref: "#/components/schemas/QuoteMinuteTick"
+        time_section:
+          type: array
+          description: 当日交易时段。
+          items:
+            $ref: "#/components/schemas/QuoteMinuteSection"
+
+    QuoteMinuteTick:
+      type: object
+      description: |
+        一条分钟级分时数据。价格、量与额为 JSON number，按 float64 承接；
+        涨跌幅是带百分号的字符串，保持原样。
+      properties:
+        time:
+          type: integer
+          format: int64
+          description: 时间戳，秒级 UNIX 时间戳。
+          example: 1780480800
+        price:
+          type: number
+          format: double
+          description: 成交价格。
+          example: 45.6
+        cc_price:
+          type: number
+          format: double
+          description: 复权价格。
+          example: 45.6
+        volume:
+          type: number
+          format: double
+          description: 成交量。
+          example: 12500
+        turnover:
+          type: number
+          format: double
+          description: 成交额。
+          example: 570000.0
+        ratio:
+          type: string
+          description: 涨跌幅，含百分号。
+          example: "0.22%"
+        change_price:
+          type: number
+          format: double
+          description: 涨跌额。
+          example: 0.1
+
+    QuoteMinuteSection:
+      type: object
+      description: 一个交易时段。
+      properties:
+        begin:
+          type: integer
+          format: int64
+          description: 时段开始时间戳，秒级 UNIX 时间戳。
+          example: 1780480800
+        end:
+          type: integer
+          format: int64
+          description: 时段结束时间戳，秒级 UNIX 时间戳。
+          example: 1780491600

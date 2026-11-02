@@ -12,12 +12,30 @@
 | --- | --- | --- |
 | `GetKLine.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-kline` 的 OpenAPI 规格 |
 | `GetKLine.md` | 本目录 | 同一接口的可读说明 |
+| `GetStockList.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-stock-list` 的 OpenAPI 规格 |
+| `GetStockList.md` | 本目录 | 同一接口的可读说明 |
+| `GetOptionQuote.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `POST /quote-api/quote-v2/get-option-quote` 的 OpenAPI 规格 |
+| `GetOptionQuote.md` | 本目录 | 同一接口的可读说明 |
+| `GetNewsList.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-news-list` 的 OpenAPI 规格 |
+| `GetNewsList.md` | 本目录 | 同一接口的可读说明 |
+| `GetEtfList.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-etf-list` 的 OpenAPI 规格 |
+| `GetEtfList.md` | 本目录 | 同一接口的可读说明 |
+| `GetFuturesList.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-futures-list` 的 OpenAPI 规格 |
+| `GetFuturesList.md` | 本目录 | 同一接口的可读说明 |
+| `GetHistoryCashTrend.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-history-cash-trend` 的 OpenAPI 规格 |
+| `GetHistoryCashTrend.md` | 本目录 | 同一接口的可读说明 |
+| `GetQuoteMinute.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-quote-minute` 的 OpenAPI 规格 |
+| `GetQuoteMinute.md` | 本目录 | 同一接口的可读说明 |
 | `Signature.md` | 本目录 | 请求签名 `quote-token` 的算法与校验向量，适用于本组全部接口 |
 
 ## 命名约定
 
 - 文件名取接口路径末段的驼峰形式，与 Go 客户端方法名保持一致：
-  `get-kline` → `GetKLine`，对应 `Client.GetKLine`；
+  `get-kline` → `GetKLine`、`get-stock-list` → `GetStockList`、
+  `get-option-quote` → `GetOptionQuote`、`get-news-list` → `GetNewsList`、
+  `get-etf-list` → `GetEtfList`、`get-futures-list` → `GetFuturesList`、
+  `get-history-cash-trend` → `GetHistoryCashTrend`、`get-quote-minute` → `GetQuoteMinute`，
+  分别对应同名客户端方法；
 - 新增接口时按同一规则分别添加 `.yaml` 与同名 `.md`：`.yaml` 放 `Meta/OpenAPI/` 下
   对应厂商与接口组目录，`.md` 放本目录。
 
@@ -27,6 +45,20 @@
   `component/quote/moomoo/quoteapiv2` 包中的 `Client.GetKLine`；
 - 查询参数在规范中的书写顺序就是签名输入的键序，与代码里的参数构造顺序一致；
 - 响应结构 `KLineResponse` 对应代码中的 `klinePayload`、`KLineItem` 对应 `klineItem`；
+- 股票列表的响应结构 `StockListResponse` 对应代码中的 `stockListPayload`，`StockListItem`
+  与 `Pagination` 与代码同名；
+- 期权报价的 `OptionQuoteResponse` 对应代码中的 `optionQuotePayload`，`OptionQuote`
+  与代码同名，`data` 解为以合约 ID 为键的 map；
+- 新闻列表的 `NewsListResponse` 对应代码中的 `newsListPayload`，`NewsListItem` 与
+  `NewsListPage` 与代码同名，`data` 中的 snake_case 字段对应 `NewsListPage` 字段；
+- ETF 列表的 `EtfListResponse` 对应代码中的 `etfListPayload`，条目复用 `StockListItem`，
+  结果结构为 `EtfListPage`。
+- 期货列表的 `FuturesListResponse` 对应代码中的 `futuresListPayload`，`FuturesListItem`
+  与 `FuturesListPage` 与代码同名，位置化字段对应 `FuturesField`。
+- 资金流水的 `CashTrendResponse` 对应代码中的 `cashTrendPayload`，`CashTrendItem` 与
+  `CashTrendPage` 与代码同名。
+- 分时行情的 `QuoteMinuteResponse` 对应代码中的 `quoteMinutePayload`，`QuoteMinute`、
+  `QuoteMinuteTick`、`QuoteMinuteSection` 与代码同名。
 - 签名算法与校验向量见 `Signature.md`，不对应具体接口，同一目录下的接口共用。
 
 新增接口时，先补齐规格文档，再按同一命名规则实现客户端方法。

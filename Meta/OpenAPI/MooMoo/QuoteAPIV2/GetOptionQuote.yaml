@@ -1,0 +1,257 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-option-quote
+  version: 1.0.0
+  description: |
+    记录 `POST /quote-api/quote-v2/get-option-quote` 的 HTTP 规格：批量获取期权合约
+    实时报价，一次可传多个合约，响应以合约 ID 为键。
+
+    与其他接口的关键差异：
+
+    - 请求方法为 `POST`，且**没有查询参数**；
+    - 签名输入是**请求体的原始字节**，不是查询串；
+    - 请求体必须紧凑且键序固定，签名后不得再格式化；
+    - `id` 为字符串、`spreadTableCode` 为整数，类型不得改动，否则服务端返回 -403。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: OptionQuote
+    description: 期权批量报价
+
+paths:
+  /quote-api/quote-v2/get-option-quote:
+    post:
+      tags:
+        - OptionQuote
+      operationId: getOptionQuote
+      summary: 批量获取期权合约报价
+      description: |
+        一次可提交多个期权合约，返回以合约 ID 为键的报价对象。已过期或已摘牌的合约
+        不会报错：整体仍返回 code=0，但 data 中不含该键（可能为空对象）。
+      parameters:
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符；签名输入为请求体原始字节，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: CSRF 标记，该接口不校验取值但必须存在，且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: content-type
+          in: header
+          required: true
+          description: 固定 `application/json`。
+          schema:
+            type: string
+            enum:
+              - application/json
+        - name: origin
+          in: header
+          required: true
+          description: 固定 `https://www.moomoo.com`。
+          schema:
+            type: string
+            default: https://www.moomoo.com
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议带上站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        input: 请求体的原始紧凑 JSON 字节，逐字节参与摘要，不额外拼接查询串。
+        steps:
+          - 以 quote_web 为密钥对请求体做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"ids":[{"id":"505895381","spreadTableCode":81},{"id":"505928056","spreadTableCode":81}]}'
+          token: "d28d1397f7"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OptionQuoteRequest"
+            example:
+              ids:
+                - id: "505895381"
+                  spreadTableCode: 81
+                - id: "505928056"
+                  spreadTableCode: 81
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，data 为以合约 ID 为键的对象，可能为空对象；
+            - `-403`：签名被拒（常见原因是请求体类型或键序与前端不一致）；
+            - `500`：参数错误，例如价差表代码与市场不匹配；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OptionQuoteResponse"
+              examples:
+                success:
+                  summary: 成功返回一个合约的报价
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      "505895381":
+                        priceBid: "8.600"
+                        volumeBid: "29"
+                        priceAsk: "9.900"
+                        volumeAsk: "13"
+                        price: "6.500"
+                        changeRatio: "-65.68%"
+                        change: "-12.440"
+                        volume: "15"
+                        turnover: "9705.00"
+                        priceDirect: down
+                expired:
+                  summary: 合约已摘牌，返回空对象
+                  value:
+                    code: 0
+                    message: 成功
+                    data: {}
+                paramsError:
+                  summary: 价差表代码与市场不匹配
+                  value:
+                    code: 500
+                    message: Params Error
+                    data: null
+
+components:
+  schemas:
+    OptionQuoteRequest:
+      type: object
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          description: 待查询的期权合约，至少一个元素；元素键序固定为 id 在前。
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OptionQuoteID"
+
+    OptionQuoteID:
+      type: object
+      required:
+        - id
+        - spreadTableCode
+      properties:
+        id:
+          type: string
+          description: 期权合约 ID，字符串形式。
+          example: "505895381"
+        spreadTableCode:
+          type: integer
+          description: |
+            价差表代码，整数形式。写成字符串会使签名输入与服务端不一致，导致 -403。
+          example: 81
+
+    OptionQuoteResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/OptionQuoteMap"
+          description: |
+            以合约 ID 为键的报价对象。已过期或已摘牌的合约不会出现在其中，
+            因此可能是空对象 `{}`，失败时也可能为 `null`。
+
+    OptionQuoteMap:
+      type: object
+      description: 键为期权合约 ID，值为该合约的报价。
+      additionalProperties:
+        $ref: "#/components/schemas/OptionQuote"
+
+    OptionQuote:
+      type: object
+      description: 单个合约的报价，全部字段为字符串，数值化需调用方自行转换。
+      properties:
+        priceBid:
+          type: string
+          description: 买盘价格。
+          example: "8.600"
+        volumeBid:
+          type: string
+          description: 买盘数量。
+          example: "29"
+        priceAsk:
+          type: string
+          description: 卖盘价格。
+          example: "9.900"
+        volumeAsk:
+          type: string
+          description: 卖盘数量。
+          example: "13"
+        price:
+          type: string
+          description: 最新成交价。
+          example: "6.500"
+        changeRatio:
+          type: string
+          description: 涨跌幅，含百分号。
+          example: "-65.68%"
+        change:
+          type: string
+          description: 涨跌额。
+          example: "-12.440"
+        volume:
+          type: string
+          description: 成交量。
+          example: "15"
+        turnover:
+          type: string
+          description: 成交额。
+          example: "9705.00"
+        priceDirect:
+          type: string
+          description: 价格方向，如 up、down。
+          example: down
