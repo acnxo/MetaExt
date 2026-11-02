@@ -54,10 +54,40 @@ jobs:
         run: go vet ./...
 
       - name: 构建
-        run: go build ./...
+        # 版本号以根目录 VERSION 为准，构建时注入到 base/version 包。
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION 2>/dev/null || true)"
+          go build -ldflags "-X github.com/acnxo/MetaExt/base/version.injected=${version}" ./...
 
       - name: 单元测试
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: 交易日历按周输出
+        # 该用例把整份日历按周一至周五逐周打印，有 1830 行，默认不显示 t.Log。
+        # 为避免每次运行都刷满日志，只有第 10、20、30… 次运行才展开表格；
+        # 其余运行只跑断言不输出，手动触发（workflow_dispatch）时始终展开。
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          run_number="${RUN_NUMBER:-0}"
+          event="${GITHUB_EVENT_NAME:-local}"
+          if [ "$event" != "workflow_dispatch" ] && [ $((run_number % 10)) -ne 0 ]; then
+            go test ./component/quote/sina/finance/cnatradecalendar \
+              -run TestTradeCalendarWeeklyLayout -count=1
+            echo "第 ${run_number} 次运行，完整表格每 10 次输出一次，本次只校验不展开。"
+            exit 0
+          fi
+          go test ./component/quote/sina/finance/cnatradecalendar \
+            -run TestTradeCalendarWeeklyLayout -v -count=1 | tee calendar-layout.log
+          {
+            echo "### 交易日历按周输出"
+            echo
+            echo '```text'
+            grep -E '^ {8}Y[0-9]{4}W[0-9]{2}' calendar-layout.log | sed 's/^        //'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 覆盖率摘要
         run: |

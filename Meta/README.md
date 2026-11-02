@@ -21,7 +21,7 @@ Meta/OpenAPI/
 ├── MooMoo/QuoteAPIV2/GetFuturesList.yaml   # 期货合约列表
 ├── MooMoo/QuoteAPIV2/GetHistoryCashTrend.yaml  # 历史资金流水
 ├── MooMoo/QuoteAPIV2/GetQuoteMinute.yaml   # 分钟级分时行情
-└── Sina/TradeCalendar/GetTradeCalendar.yaml  # 交易日历（占位）
+└── Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
 ```
 
 ## 与 Docs 的分工
@@ -73,4 +73,4 @@ Docs/OpenAPI/MooMoo/QuoteAPIV2/GetKLine.md
 - 用 `x-todo` 列出待确认项；
 - 确认完成后去掉 `x-status`，补齐内容。
 
-参考 [`OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml`](OpenAPI/Sina/TradeCalendar/GetTradeCalendar.yaml)。
+参考 [`OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml`](OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml)。

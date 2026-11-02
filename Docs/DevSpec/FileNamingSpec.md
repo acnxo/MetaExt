@@ -73,11 +73,16 @@
 | 跨接口说明 | 主题名大驼峰 + `.md` | `Signature.md` |
 | 目录索引 | 固定 `README.md` | `README.md` |
 
-厂商与接口组目录同样用大驼峰：
+厂商、分类与接口组目录同样用大驼峰，层级与 Go 包目录一一对应：
 
 ```
+# 代码 component/quote/moomoo/quoteapiv2
 Meta/OpenAPI/MooMoo/QuoteAPIV2/GetKLine.yaml
 Docs/OpenAPI/MooMoo/QuoteAPIV2/GetKLine.md
+
+# 代码 component/quote/sina/finance/cnatradecalendar
+Meta/OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml
+Docs/OpenAPI/Sina/Finance/CnaTradeCalendar/GetTradeCalendar.md
 ```
 
 完整路径约定见 [`HTTPAPIDocSpec.md`](HTTPAPIDocSpec.md) 第九节。
