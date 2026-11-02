@@ -4,6 +4,10 @@
 // 自行处理。当前实现 get-kline 一个接口，其余接口可按同样的方式在 Client 上扩展：
 // 构造有序参数、签名、发请求、解析响应四步。
 //
+// 对外方法名与接口路径保持映射关系：取路径末段按驼峰命名，例如 /quote-api/quote-v2/
+// get-kline 对应 GetKline，要新增接口时沿用同一规则，以便从方法名直接看出调用的
+// 是哪个接口。请求参数与返回类型同样带上接口前缀，避免不同接口之间用泛泛的通用名。
+//
 // 请求流程上有两点必须遵守：
 //
 //   - 查询串的键序就是签名输入的键序，不能用 map 或 url.Values 排序后发送；
@@ -12,16 +16,11 @@ package quoteapiv2
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"crypto/sha512"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -54,18 +53,6 @@ const (
 	CodeTokenInvalid = -403
 )
 
-// 签名相关常量。
-const (
-	// signKey HMAC 密钥，取自网页前端产物，不是用户凭据。
-	signKey = "quote_web"
-	// hmacTruncLen HMAC-SHA512 十六进制结果截取长度。
-	hmacTruncLen = 10
-	// tokenLen 最终 quote-token 长度。
-	tokenLen = 10
-	// emptyInputFallback 空输入时的降级字面量，与前端行为一致。
-	emptyInputFallback = "quote"
-)
-
 // APIError 接口层错误：HTTP 失败或业务码非成功。
 type APIError struct {
 	// Path 本次调用的接口路径，用于区分同一客户端下的不同接口。
@@ -88,6 +75,9 @@ func (e *APIError) Error() string {
 		return fmt.Sprintf("moomoo %s 调用失败：code=%d message=%s（url=%s）", e.Path, e.Code, e.Message, e.URL)
 	case e.HTTPStatus != 0:
 		return fmt.Sprintf("moomoo %s HTTP 错误：%d（url=%s）", e.Path, e.HTTPStatus, e.URL)
+	case e.Message != "":
+		// 解析失败、网络错误等情况下没有状态码与业务码，必须带上原因。
+		return fmt.Sprintf("moomoo %s 请求失败：%s（url=%s）", e.Path, e.Message, e.URL)
 	default:
 		return fmt.Sprintf("moomoo %s 请求失败（url=%s）", e.Path, e.URL)
 	}
@@ -170,12 +160,12 @@ func New(cfg Config) *Client {
 // Config 返回生效配置（已补齐默认值）。
 func (c *Client) Config() Config { return c.cfg }
 
-// KlineRequest K 线请求参数。
+// GetKlineRequest K 线请求参数（对应 get-kline 接口）。
 //
 // 五个定位参数（StockID / MarketType / MarketCode / InstrumentType /
 // SubInstrumentType）原样透传，不做语义换算：同一编号在不同接口含义不同，
 // 换算会引入难以排查的错位。
-type KlineRequest struct {
+type GetKlineRequest struct {
 	// StockID 标的编号，必填。
 	StockID string
 	// MarketType 市场类型。
@@ -192,9 +182,9 @@ type KlineRequest struct {
 	TimestampMillis string
 }
 
-// Bar 一根 K 线，保持接口原始口径：时间为秒级 UNIX 时间戳，价格保留字符串
-// 以免浮点精度损失，数值仅在明确是数字时使用 float64 承载。
-type Bar struct {
+// KlineBar 一根 K 线，保持接口原始口径：时间为秒级 UNIX 时间戳，价格保留字符串
+// 以免浮点精度损失，数值仅在明确是数字时使用 float64 承载。由 GetKline 返回。
+type KlineBar struct {
 	// Time 秒级 UNIX 时间戳。
 	Time int64
 	// Open 开盘价原始字符串，可能为空。
@@ -217,13 +207,13 @@ type Bar struct {
 	ChangePrice string
 }
 
-// Kline 拉取全量 K 线序列。
+// GetKline 拉取全量 K 线序列（对应 get-kline 接口）。
 //
 // 该接口无分页与时间范围参数，一次返回全部历史数据；返回值按时间升序（最早在前），
 // 与接口顺序一致，区间过滤由调用方完成。
-func (c *Client) Kline(ctx context.Context, req KlineRequest) ([]Bar, error) {
+func (c *Client) GetKline(ctx context.Context, req GetKlineRequest) ([]KlineBar, error) {
 	if strings.TrimSpace(req.StockID) == "" {
-		return nil, errors.New("moomoo Kline：stockId 不能为空")
+		return nil, errors.New("moomoo GetKline：stockId 不能为空")
 	}
 	klineType := strings.TrimSpace(req.KlineType)
 	if klineType == "" {
@@ -300,106 +290,6 @@ func (c *Client) url(params []Param) string {
 	return c.cfg.BaseURL + c.cfg.Path + "?" + SignedQuery(params)
 }
 
-// Param 有序查询参数；值为已字符串化的结果。
-type Param struct {
-	Name  string
-	Value string
-}
-
-// Params 按「名称, 值, 名称, 值...」的顺序构造参数列表。
-func Params(pairs ...string) []Param {
-	params := make([]Param, 0, len(pairs)/2)
-	for i := 0; i+1 < len(pairs); i += 2 {
-		params = append(params, Param{Name: pairs[i], Value: pairs[i+1]})
-	}
-	return params
-}
-
-// SignInput 把有序参数拼成紧凑 JSON 字符串作为签名输入。
-//
-// 这里不用 encoding/json：对象键序、紧凑格式与转义方式都是签名契约的一部分，
-// 标准库会对键排序或改写格式，直接导致 token 与服务端不一致。
-func SignInput(params []Param) string {
-	if len(params) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	b.Grow(len(params) * 24)
-	b.WriteByte('{')
-	for i, p := range params {
-		if i > 0 {
-			b.WriteByte(',')
-		}
-		b.WriteByte('"')
-		b.WriteString(escapeJSONString(p.Name))
-		b.WriteString(`":"`)
-		b.WriteString(escapeJSONString(p.Value))
-		b.WriteByte('"')
-	}
-	b.WriteByte('}')
-	return b.String()
-}
-
-// Sign 计算 quote-token：HMAC-SHA512 → 取前 10 位十六进制 → SHA-256 → 取前 10 位。
-//
-// 空输入按协议降级为字面量 "quote"。
-func Sign(input string) string {
-	if len(input) == 0 {
-		input = emptyInputFallback
-	}
-	mac := hmac.New(sha512.New, []byte(signKey))
-	mac.Write([]byte(input))
-	first := hex.EncodeToString(mac.Sum(nil))[:hmacTruncLen]
-
-	sum := sha256.Sum256([]byte(first))
-	return hex.EncodeToString(sum[:])[:tokenLen]
-}
-
-// SignParams 计算有序参数对应的 quote-token。
-func SignParams(params []Param) string { return Sign(SignInput(params)) }
-
-// SignedQuery 按参数原顺序拼查询串。
-//
-// 不能用 url.Values.Encode：它会按键名排序，破坏签名键序。
-func SignedQuery(params []Param) string {
-	var b strings.Builder
-	for i, p := range params {
-		if i > 0 {
-			b.WriteByte('&')
-		}
-		b.WriteString(url.QueryEscape(p.Name))
-		b.WriteByte('=')
-		b.WriteString(url.QueryEscape(p.Value))
-	}
-	return b.String()
-}
-
-// escapeJSONString 做 JSON 最小转义，非 ASCII 字符保留原始 UTF-8 形式。
-func escapeJSONString(s string) string {
-	if !strings.ContainsAny(s, `"\\`+"\n\r\t") {
-		return s
-	}
-	var b strings.Builder
-	b.Grow(len(s) + 8)
-	for _, r := range s {
-		switch r {
-		case '"':
-			b.WriteString(`\"`)
-		case '\\':
-			b.WriteString(`\\`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
-		case '\t':
-			b.WriteString(`\t`)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
 // klinePayload K 线响应外层包裹。
 type klinePayload struct {
 	Code    int       `json:"code"`
@@ -427,11 +317,11 @@ type klineData struct {
 	List []klineItem `json:"list"`
 }
 
-// Bars 把原始条目转换为 Bar 切片。
-func (p klineData) Bars() []Bar {
-	bars := make([]Bar, 0, len(p.List))
+// Bars 把原始条目转换为 KlineBar 切片。
+func (p klineData) Bars() []KlineBar {
+	bars := make([]KlineBar, 0, len(p.List))
 	for _, item := range p.List {
-		bar := Bar{
+		bar := KlineBar{
 			Time:        item.K,
 			Open:        item.O.String(),
 			High:        item.H.String(),
