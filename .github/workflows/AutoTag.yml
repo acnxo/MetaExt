@@ -1,19 +1,13 @@
 name: AutoTag
 
-# 发版 PR 合并到 main 后自动打 tag 并创建 Release。
-# 版本号取自 PR 标题中的 X.Y.Z，例如标题 "Release:V0.1.1" 对应 tag v0.1.1。
-# 标签已存在时直接跳过，可重复触发；也可用 workflow_dispatch 手动补打。
+# 合并到 main 后按根目录 VERSION 文件自动打 tag 并创建 Release。
+# 版本号唯一来源是 VERSION（内容形如 v0.1.1），标签已存在时跳过，
+# 因此可以重复触发；也可用 workflow_dispatch 手动补打。
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      version:
-        description: "版本号，如 v0.1.1"
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -24,62 +18,48 @@ concurrency:
 
 jobs:
   tag-and-release:
-    name: 打 tag 并创建 Release
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    name: 按 VERSION 打 tag 并创建 Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: 解析版本号
-        id: version
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-          INPUT: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          if [ -n "${INPUT:-}" ]; then
-            source="$INPUT"
-          elif printf '%s' "${TITLE:-}" | grep -qi 'release'; then
-            source="$TITLE"
-          else
-            echo "PR 标题不含 release，非发版合并，跳过。"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # 支持可选的预发布后缀，如 v1.0.0-rc.1。
-          raw="$(printf '%s' "$source" \
-            | grep -oiE 'v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9a-z.]+)?' | head -n 1 || true)"
-          if [ -z "$raw" ]; then
-            echo "无法从「$source」解析出版本号，跳过。"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          tag="v${raw#[vV]}"
-          echo "解析到版本：$tag"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-
       - name: 检出代码
-        if: steps.version.outputs.skip != 'true'
         uses: actions/checkout@v4
         with:
-          # PR 合并时打在合并提交上；手动触发时取触发分支的最新提交。
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
+          # 生成变更说明需要完整历史与标签。
           fetch-depth: 0
+
+      - name: 读取版本号
+        id: version
+        run: |
+          set -euo pipefail
+          if [ ! -f VERSION ]; then
+            echo "未找到 VERSION 文件，跳过。"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          raw="$(tr -d '[:space:]' < VERSION)"
+          tag="v${raw#[vV]}"
+          if ! printf '%s' "$tag" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9a-z.]+)?$'; then
+            echo "VERSION 内容「${raw}」不是合法版本号，跳过。"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "VERSION 声明的版本：${tag}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: 打 tag 并创建 Release
         if: steps.version.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
-          TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
             echo "标签 ${TAG} 已存在，跳过，避免重复发布。"
             exit 0
           fi
-          subject="${TITLE:-手动发布 ${TAG}}"
-          git tag -a "${TAG}" -m "${TAG}：${subject}"
+          git tag -a "${TAG}" -m "${TAG}：由 VERSION 文件声明"
           git push origin "${TAG}"
           # 由 GITHUB_TOKEN 推送的标签不会再次触发 Release 工作流，
           # 因此在这里直接创建 Release。

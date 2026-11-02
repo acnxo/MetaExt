@@ -101,7 +101,7 @@ infra/                  配置、日志、存储等基础设施实现与装配
 | --- | --- | --- |
 | `CICD` | 推送或 PR 到 `main`、`dev`，或手动触发 | `gofmt` 检查、`go vet`、`go build ./...`、`go test -race` 并上传覆盖率报告 |
 | `Release` | 推送 `v*` 标签 | 先跑格式检查、`go vet`、`go test -race`，通过后创建 Release 并自动生成变更说明 |
-| `AutoTag` | 发版 PR 合并到 `main`，或手动触发 | 从 PR 标题解析版本号，打附注 tag 并创建 Release；标签已存在时跳过 |
+| `AutoTag` | 推送到 `main`，或手动触发 | 读取根目录 `VERSION`，打附注 tag 并创建 Release；标签已存在时跳过 |
 
 工作流文件为 `.github/workflows/CICD.yml`、`Release.yml` 与 `AutoTag.yml`。CI 使用的
 Go 版本从 `go.mod` 读取，不另外固定；覆盖率汇总会写入 Actions 的运行摘要。
