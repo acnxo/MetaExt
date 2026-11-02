@@ -22,8 +22,13 @@ Meta External Impl —— 外部数据接口的 Go 实现集合。
 
 ## 作为依赖引用
 
+当前最新版本：**v0.1.0**（[Release 说明](https://github.com/acnxo/MetaExt/releases/tag/v0.1.0)）。
+
 ```bash
-# 拉取最新版本
+# 固定到某个版本（推荐给第三方生产依赖）
+go get github.com/acnxo/MetaExt@v0.1.0
+
+# 跟随最新版本（仅适合尝鲜）
 go get github.com/acnxo/MetaExt@latest
 ```
 
@@ -35,6 +40,10 @@ import (
 ```
 
 仅导入用到的包即可，未引用的包不会进入下游的编译产物。
+
+版本号遵循语义化版本，变更记录见 [CHANGELOG.md](CHANGELOG.md)，发版流程与兼容策略见
+[Docs/DevSpec/ReleaseSpec.md](Docs/DevSpec/ReleaseSpec.md)。`v0.y.z` 阶段公开 API 仍在成形，
+升级前请先查看变更日志。
 
 ## 环境要求
 
@@ -84,6 +93,15 @@ infra/                  配置、日志、存储等基础设施实现与装配
 | `util` | 无状态的纯函数工具，不引用 model、sdk、infra |
 | `common` | 公共常量、枚举与轻量值对象 |
 | `infra` | 配置、日志、存储、缓存等实现，仅由入口层装配引用 |
+
+## 版本与发版
+
+| 项 | 位置 |
+| --- | --- |
+| 变更日志 | `CHANGELOG.md` |
+| 发版规范 | `Docs/DevSpec/ReleaseSpec.md` |
+| 版本号来源 | `main` 上的附注 tag（`vX.Y.Z`），不写在 `go.mod` |
+| 自动发布 | 推送 `v*` tag 后由 `Release` 工作流校验并创建 Release |
 
 ## 扩展新的接口实现
 
