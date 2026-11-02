@@ -1,0 +1,254 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-history-cash-trend
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-history-cash-trend` 的 HTTP 规格：获取个股历史
+    资金流水，包含各单型净流入、主力净流入与占比，支持日 / 周 / 月三档粒度，
+    以响应记录的 `time` 作为游标向前翻页。
+
+    三个必须注意的点：
+
+    - `type` 是**非校验型参数**：省略时服务端不报错，只返回空列表，属静默失败；
+    - 空列表不等于参数错误，也可能是标的没有数据或 `stockId` 无效；
+    - 比率字段是**百分数乘以 100**（`117` 表示 +1.17%），展示时需除以 100。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: CashTrend
+    description: 历史资金流水
+
+paths:
+  /quote-api/quote-v2/get-history-cash-trend:
+    get:
+      tags:
+        - CashTrend
+      operationId: getHistoryCashTrend
+      summary: 获取个股历史资金流水
+      description: |
+        按粒度返回资金流水记录，`baseTime` 为游标：传 0 取最新一段，传上一页返回记录中
+        的 `time` 则继续向前翻页。列表顺序与服务端实现相关，翻页时建议按 `time` 比较取值，
+        不要依赖元素位置。
+      parameters:
+        - name: stockId
+          in: query
+          required: true
+          description: 服务端内部股票 ID。
+          schema:
+            type: string
+          example: "203290"
+        - name: type
+          in: query
+          required: true
+          description: |
+            资金流粒度。有数据的取值：`1` 日、`2` 周、`3` 月；`0`、`4`、`5`、`6` 与
+            完全省略均返回空列表，因此必须显式传入，不能依赖默认值。
+          schema:
+            type: string
+            enum:
+              - "1"
+              - "2"
+              - "3"
+          example: "1"
+        - name: baseTime
+          in: query
+          required: true
+          description: |
+            分页基准时间戳（秒）。0 表示最新一段；向前翻页时传上一页记录中的 `time`。
+          schema:
+            type: string
+            default: "0"
+            pattern: '^[0-9]+$'
+          example: "0"
+        - name: "_"
+          in: query
+          required: false
+          description: 毫秒级 UNIX 时间戳。缺省时整键省略。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1789943637356"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            CSRF 标记。该接口观测到不校验其取值，但按既有约定仍需携带，
+            且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议带上站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化，键序不得重排。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"stockId":"203290","type":"1","baseTime":"0","_":"1789943637356"}'
+          token: "44346db4fa"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功；`list` 可能为空，属正常响应；
+            - `-403`：签名被拒；
+            - `500`：参数错误；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashTrendResponse"
+              examples:
+                success:
+                  summary: 日粒度返回一条记录
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      hasMore: true
+                      list:
+                        - time: "1786075200"
+                          totalNetIn: "-700324120157"
+                          superNetIn: "9752295125"
+                          bigNetIn: "-293476434557"
+                          midNetIn: "-248713964950"
+                          smlNetIn: "-167886015775"
+                          mainNetIn: "-283724139432"
+                          priceChangeRatio: "117"
+                          closePrice: "723.03"
+                          mainDealRatio: "2897"
+                          accMainNetIn: "-283724139432"
+                empty:
+                  summary: 无数据（type 缺失、粒度无数据或标的无效均为此形态）
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      hasMore: false
+                      list: []
+
+components:
+  schemas:
+    CashTrendResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/CashTrendData"
+          description: 业务数据，失败时可能为 null。
+
+    CashTrendData:
+      type: object
+      properties:
+        hasMore:
+          type: boolean
+          description: 是否还有更早一段数据。
+          example: true
+        list:
+          type: array
+          description: |
+            资金流水记录。空数组表示没有数据：可能是粒度无数据、标的无效，
+            也可能是 type 被省略。
+          items:
+            $ref: "#/components/schemas/CashTrendItem"
+
+    CashTrendItem:
+      type: object
+      description: |
+        一段资金流水。字段全部为字符串：金额是最小货币单位的整数字符串，
+        比率是百分数乘以 100 的结果，展示时需除以 100。
+      properties:
+        time:
+          type: string
+          description: 秒级 UNIX 时间戳，字符串形式；翻页时作为下次的 baseTime。
+          example: "1786075200"
+        totalNetIn:
+          type: string
+          description: 总净流入，最小货币单位的整数字符串。
+          example: "-700324120157"
+        superNetIn:
+          type: string
+          description: 特大单净流入。
+          example: "9752295125"
+        bigNetIn:
+          type: string
+          description: 大单净流入。
+          example: "-293476434557"
+        midNetIn:
+          type: string
+          description: 中单净流入。
+          example: "-248713964950"
+        smlNetIn:
+          type: string
+          description: 小单净流入。
+          example: "-167886015775"
+        mainNetIn:
+          type: string
+          description: 主力净流入，即特大单加大单。
+          example: "-283724139432"
+        priceChangeRatio:
+          type: string
+          description: 涨跌幅，百分数乘以 100（"117" 表示 +1.17%）。
+          example: "117"
+        closePrice:
+          type: string
+          description: 该期收盘价。
+          example: "723.03"
+        mainDealRatio:
+          type: string
+          description: 主力成交占比，百分数乘以 100（"2897" 表示 28.97%）。
+          example: "2897"
+        accMainNetIn:
+          type: string
+          description: 累计主力净流入。
+          example: "-283724139432"

@@ -28,6 +28,21 @@ func TestSignVectors(t *testing.T) {
 			"7feb1b1665",
 		},
 		{
+			"股票列表完整参数",
+			`{"marketType":"1","plateType":"1","rankType":"3","page":"1","pageSize":"50","_":"1781611867445"}`,
+			"6481798cf4",
+		},
+		{
+			"股票列表仅必填参数",
+			`{"marketType":"1","plateType":"1"}`,
+			"0fdcd3ce32",
+		},
+		{
+			"期权批量报价请求体",
+			`{"ids":[{"id":"505895381","spreadTableCode":81},{"id":"505928056","spreadTableCode":81}]}`,
+			"d28d1397f7",
+		},
+		{
 			"使用下划线命名的参数",
 			`{"stock_id":"76033806042898","market_type":"1","type":"0","subType":"0","_":"1781592384789"}`,
 			"055b0960ec",

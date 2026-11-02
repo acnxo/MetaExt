@@ -1,0 +1,313 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-futures-list
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-futures-list` 的 HTTP 规格：按市场与分类获取
+    期货合约列表，支持分页。
+
+    该接口的响应是**位置化字段结构**，与其他列表接口不同：
+
+    - `fieldList` 是按位置排列的字段定义，含原始值（`value`）、文本值（`text`）、
+      小数位（`precision`）与内容类型（`contentType`）；
+    - `fields` 是按字段编号索引的展示值映射，键为编号的字符串形式；
+    - `fields` 比 `fieldList` 多一个键 `19`（市场标签），`fieldList` 中没有对应项。
+
+    一般直接使用 `fields` 中的展示值；需要自己换算数值时才按内容类型还原 `value`。
+    页码从 0 开始。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: FuturesList
+    description: 期货合约列表
+
+paths:
+  /quote-api/quote-v2/get-futures-list:
+    get:
+      tags:
+        - FuturesList
+      operationId: getFuturesList
+      summary: 按市场与分类拉取期货合约列表
+      description: |
+        `marketType` 与 `futuresType` 必须成对使用。已观测的组合：
+        美股商品期货（2/4）、美股股指期货（2/1）、港股股指期货（1/8）。
+      parameters:
+        - name: marketType
+          in: query
+          required: true
+          description: 市场类型，必填，原样透传。
+          schema:
+            type: string
+          example: "2"
+        - name: futuresType
+          in: query
+          required: true
+          description: 期货分类，必填，原样透传，需与 marketType 成对使用。
+          schema:
+            type: string
+          example: "4"
+        - name: page
+          in: query
+          required: false
+          description: 页码，从 0 开始（0 即第 1 页）；缺省时补默认值 "0"。
+          schema:
+            type: string
+            default: "0"
+            pattern: '^[0-9]+$'
+          example: "0"
+        - name: pageSize
+          in: query
+          required: false
+          description: 每页数量，缺省时补默认值 "40"。
+          schema:
+            type: string
+            default: "40"
+            pattern: '^[1-9][0-9]*$'
+          example: "40"
+        - name: "_"
+          in: query
+          required: false
+          description: 毫秒级 UNIX 时间戳。缺省时整键省略。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1789944039632"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            CSRF 标记。该接口观测到不校验其取值，但按既有约定仍需携带，
+            且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+        - name: referer
+          in: header
+          required: false
+          description: 来源页，建议带上站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化，键序不得重排。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        example:
+          input: '{"marketType":"2","futuresType":"4","page":"0","pageSize":"40","_":"1789944039632"}'
+          token: "d928a3b3e1"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，分页信息在 data.pagination，条目在 data.list；
+            - `-403`：签名被拒；
+            - `500`：参数错误，例如 marketType 与 futuresType 组合不被接受；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FuturesListResponse"
+              examples:
+                success:
+                  summary: 美股商品期货首页（fieldList 与 fields 为节选）
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      pagination:
+                        page: 0
+                        pageCount: 1
+                        pageSize: 40
+                        total: 14
+                      list:
+                        - stockId: 70000294
+                          priceDirect: down
+                          fieldList:
+                            - fieldId: 1
+                              fieldName: 合约代码
+                              text: GCmain
+                              contentType: 4
+                            - fieldId: 3
+                              fieldName: 价格
+                              value: "4413800000000"
+                              precision: 1
+                              contentType: 2
+                            - fieldId: 4
+                              fieldName: 涨跌幅
+                              value: "-2508531"
+                              precision: 2
+                              contentType: 1
+                          fields:
+                            "1": GCmain
+                            "2": 黄金
+                            "3": "4413.8"
+                            "4": "-0.25%"
+                            "11": "315327.0"
+                            "18": "4424.9"
+                            "19": US
+                paramsError:
+                  summary: 市场与分类组合不被接受
+                  value:
+                    code: 500
+                    message: Params Error
+                    data: null
+
+components:
+  schemas:
+    FuturesListResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/FuturesListData"
+          description: 业务数据，失败时可能为 null。
+
+    FuturesListData:
+      type: object
+      properties:
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        list:
+          type: array
+          description: 期货条目，顺序由服务端决定。
+          items:
+            $ref: "#/components/schemas/FuturesListItem"
+
+    Pagination:
+      type: object
+      description: 分页元信息。本接口页码从 0 开始。
+      properties:
+        page:
+          type: integer
+          description: 当前页码，从 0 开始。
+          example: 0
+        pageCount:
+          type: integer
+          description: 总页数。
+          example: 1
+        pageSize:
+          type: integer
+          description: 每页数量。
+          example: 40
+        total:
+          type: integer
+          description: 总条数，随行情变化。
+          example: 14
+
+    FuturesListItem:
+      type: object
+      description: |
+        期货条目。字段是位置化的：`fields` 提供按编号索引的展示值，
+        `fieldList` 提供按位置排列的字段定义与原始值。
+      required:
+        - stockId
+      properties:
+        stockId:
+          type: integer
+          format: int64
+          description: 服务端内部证券唯一标识。
+          example: 70000294
+        priceDirect:
+          type: string
+          description: 价格方向，如 up、down。
+          example: down
+        fieldList:
+          type: array
+          description: |
+            字段定义数组。观测到含 18 项，位置与含义固定：
+            1 合约代码、2 名称、3 价格、4 涨跌幅、5 涨跌额、6 买入价、7 卖出价、
+            8 买量、9 卖量、10 成交量、11 持仓量、12 日增仓、13 开盘、14 最高、
+            15 最低、16 最后交易、17 昨结、18 昨收。
+          items:
+            $ref: "#/components/schemas/FuturesField"
+        fields:
+          type: object
+          description: |
+            字段展示值的映射，键为字段编号的字符串形式，值为已换算的展示文本。
+            比 fieldList 多一个键 "19"（市场标签，如 US、HK），该键在 fieldList 中
+            没有对应项。
+          additionalProperties:
+            type: string
+          example:
+            "1": GCmain
+            "3": "4413.8"
+            "4": "-0.25%"
+            "19": US
+
+    FuturesField:
+      type: object
+      description: |
+        位置化字段定义。文本类字段返回 `text`，数值类字段返回 `value`；
+        `precision` 与 `contentType` 决定数值的还原方式。
+      properties:
+        fieldId:
+          type: integer
+          description: 字段位置，从 1 开始，各品种位置固定。
+          example: 3
+        fieldName:
+          type: string
+          description: |
+            字段名，语种由服务端决定，可能中英切换，不要按名称硬编码逻辑，
+            应按 fieldId 判断。
+          example: 价格
+        value:
+          type: string
+          description: 数值类字段的原始值，通常是放大后的整数，仅数值类字段返回。
+          example: "4413800000000"
+        text:
+          type: string
+          description: 文本类字段的值，如合约代码、名称，仅文本类字段返回。
+          example: GCmain
+        precision:
+          type: integer
+          description: 小数位。价格类为放大偏移，数量类为展示小数位。
+          example: 1
+        contentType:
+          type: integer
+          description: 内容类型，决定数值的还原方式。
+          example: 2
