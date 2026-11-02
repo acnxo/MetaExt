@@ -1,0 +1,283 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 网页行情接口（quote-v2）
+  version: 1.0.0
+  description: |
+    记录 moomoo（富途）网页端行情接口 /quote-api/quote-v2/* 的 HTTP 规格，
+    依据网页端实际发出的请求与返回的响应整理，用于对照 Go 侧实现与联调排查。
+
+    约定：
+
+    - 鉴权不依赖登录态，而是请求头 quote-token 携带的签名，签名规则见各操作的
+      x-signature 扩展字段；
+    - HTTP 状态码只表示传输层结果，业务结果一律看响应体的 code 字段；
+    - 查询参数的书写顺序即签名输入的键序，调整顺序会导致签名不通过。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: Kline
+    description: K 线行情
+
+paths:
+  /quote-api/quote-v2/get-kline:
+    get:
+      tags:
+        - Kline
+      operationId: getKline
+      summary: 拉取全量 K 线
+      description: |
+        按标的与周期返回全部历史 K 线。接口没有分页、没有起止时间参数，
+        一次返回全部数据；返回顺序为时间升序（最早在前），区间过滤由调用方完成。
+
+        五个定位参数（stockId、marketType、marketCode、instrumentType、
+        subInstrumentType）来自行情元数据，属于不同编号体系，必须原样透传，
+        不要做语义换算或跨接口复用同一数值。
+      parameters:
+        - name: stockId
+          in: query
+          required: true
+          description: 标的编号，不能为空。
+          schema:
+            type: string
+          example: "70000294"
+        - name: marketType
+          in: query
+          required: true
+          description: 市场类型编号，原样透传。
+          schema:
+            type: string
+          example: "2"
+        - name: type
+          in: query
+          required: false
+          description: K 线周期。为空时站点按日 K 处理，日 K 的取值为 "2"。
+          schema:
+            type: string
+            default: "2"
+          example: "2"
+        - name: marketCode
+          in: query
+          required: true
+          description: 市场代码，原样透传。
+          schema:
+            type: string
+          example: "70"
+        - name: instrumentType
+          in: query
+          required: true
+          description: 标的类型，原样透传。
+          schema:
+            type: string
+          example: "9"
+        - name: subInstrumentType
+          in: query
+          required: true
+          description: 标的子类型，原样透传。
+          schema:
+            type: string
+          example: "9008"
+        - name: "_"
+          in: query
+          required: true
+          description: 毫秒级 UNIX 时间戳，用于防缓存，同时参与签名。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1780507278122"
+        - name: quote-token
+          in: header
+          required: true
+          description: |
+            请求签名。由全部查询参数按「键序 + 字符串值」拼成紧凑 JSON 后经过两段
+            摘要计算得到，规则见本操作的 x-signature 扩展字段。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            站点要求存在的 CSRF 标记。该接口不校验其取值，但仍需携带，
+            且需与 Cookie 中的 csrfToken 保持一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: |
+            需包含 csrfToken 与 locale 两项，例如
+            `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: referer
+          in: header
+          required: true
+          description: 来源页，需为站点页面地址。
+          schema:
+            type: string
+            default: https://www.moomoo.com/
+        - name: user-agent
+          in: header
+          required: true
+          description: 浏览器 UA。非浏览器 UA 可能被站点直接拒绝。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+            default: application/json
+      x-signature:
+        summary: quote-token 的生成方式
+        steps:
+          - name: 拼装签名输入
+            description: |
+              按查询参数在请求中出现的顺序，把「名称 → 值」写成紧凑 JSON，
+              形如 {"stockId":"70000294","marketType":"2",...}。
+              值一律先字符串化再写入，不插入空格，键序不得重排。
+          - name: 第一段摘要
+            description: |
+              以字面量 quote_web 为密钥，对签名输入做 HMAC-SHA512，
+              取十六进制结果的前 10 个字符。
+          - name: 第二段摘要
+            description: 对第一段的结果字符串做 SHA-256，取十六进制结果的前 10 个字符。
+          - name: 空输入
+            description: 签名输入为空时，以字面量 quote 代替，其余步骤不变。
+        keyNote: quote_web 取自网页前端产物，不属于用户凭据。
+        example:
+          input: '{"stockId":"70000294","marketType":"2","type":"2","marketCode":"70","instrumentType":"9","subInstrumentType":"9008","_":"1780507278122"}'
+          token: "45671b44c1"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，数据在 data.list 中；
+            - `-403`：签名被拒（通常意味着签名输入的键序或值形式有误）；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KlineResponse"
+              examples:
+                success:
+                  summary: 成功返回一根日 K
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      list:
+                        - k: 157870800
+                          o: "187.5"
+                          c: "178.2"
+                          h: "187.5"
+                          l: "176"
+                          v: 0
+                          t: 0
+                          r: null
+                          lc: 187.5
+                          cp: "-9.3"
+                tokenRejected:
+                  summary: 签名被拒
+                  value:
+                    code: -403
+                    message: 非法请求
+                    data: null
+        "502":
+          description: 网关层错误，响应体为纯文本，不代表业务结果。
+
+components:
+  schemas:
+    KlineResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/KlineData"
+          description: 业务数据，失败时可能为 null。
+
+    KlineData:
+      type: object
+      properties:
+        list:
+          type: array
+          description: K 线序列，按时间升序（最早在前）。
+          items:
+            $ref: "#/components/schemas/KlineItem"
+
+    KlineItem:
+      type: object
+      description: |
+        单根 K 线。字段类型存在字符串与数值混用的情况：开高低收与涨跌额通常为
+        字符串，量与额通常为数值，因此统一用 FlexNumber 描述，按原始文本保留。
+      required:
+        - k
+      properties:
+        k:
+          type: integer
+          format: int64
+          description: K 线时间，秒级 UNIX 时间戳。
+          example: 157870800
+        o:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 开盘价。
+        h:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 最高价。
+        l:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 最低价。
+        c:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 收盘价。
+        v:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 成交量。
+        t:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 成交额。
+        r:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 涨跌幅，样本中均为 null。
+        lc:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 昨收价。
+        cp:
+          allOf:
+            - $ref: "#/components/schemas/FlexNumber"
+          description: 涨跌额，含符号，通常为字符串。
+
+    FlexNumber:
+      description: |
+        可能是数值，也可能以字符串形式给出，缺失时为 null。
+        以字符串形式承载可以避免浮点精度损失。
+      oneOf:
+        - type: string
+        - type: number
+        - type: "null"
