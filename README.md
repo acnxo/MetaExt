@@ -1,5 +1,7 @@
 # MetaExt
 
+[![CICD](https://github.com/acnxo/MetaExt/actions/workflows/CICD.yml/badge.svg?branch=dev)](https://github.com/acnxo/MetaExt/actions/workflows/CICD.yml)
+
 Meta External Impl —— 外部数据接口的 Go 实现集合。
 
 ## 定位
@@ -90,6 +92,18 @@ infra/                  配置、日志、存储等基础设施实现与装配
 3. 错误按 HTTP 状态与业务码分类，并提供可判定的错误类型；
 4. 不承载业务流程，也不直接访问存储；
 5. 新增能力优先考虑放进 `util`、`model`、`common` 等公共包，便于其他项目直接复用。
+
+## 持续集成
+
+仓库内置两个 GitHub Actions 工作流，位于 `.github/workflows/`：
+
+| 工作流 | 触发条件 | 内容 |
+| --- | --- | --- |
+| `CICD` | 推送或 PR 到 `main`、`dev`，或手动触发 | `gofmt` 检查、`go vet`、`go build ./...`、`go test -race` 并上传覆盖率报告 |
+| `Release` | 推送 `v*` 标签 | 先跑格式检查、`go vet`、`go test -race`，通过后创建 Release 并自动生成变更说明 |
+
+工作流文件为 `.github/workflows/CICD.yml` 与 `.github/workflows/Release.yml`。CI 使用的
+Go 版本从 `go.mod` 读取，不另外固定；覆盖率汇总会写入 Actions 的运行摘要。
 
 ## 许可
 
