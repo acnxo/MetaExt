@@ -99,7 +99,7 @@ func (c *Client) GetFuturesList(ctx context.Context, req GetFuturesListRequest) 
 	}
 
 	path := c.cfg.FuturesListPath
-	body, err := c.get(ctx, path, params)
+	body, err := c.getList(ctx, path, params)
 	if err != nil {
 		return FuturesListPage{}, err
 	}

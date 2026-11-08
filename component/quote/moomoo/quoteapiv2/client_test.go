@@ -1,6 +1,7 @@
 package quoteapiv2
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -151,5 +152,121 @@ func TestTruncate(t *testing.T) {
 	}
 	if got := truncate("abc", 3); got != "abc" {
 		t.Fatalf("未超长时不应改变内容：%s", got)
+	}
+}
+
+// TestConfigHeader 自定义请求头应在内置头之后生效：同名覆盖、空白键跳过；
+// 并且 New 时浅拷贝，调用方后续改 map 不影响已建客户端。
+func TestConfigHeader(t *testing.T) {
+	var got http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"code":0,"data":{"pagination":{},"list":[]}}`))
+	}))
+	defer server.Close()
+
+	header := map[string]string{
+		"accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+		"accept":          "application/vnd.moomoo+json",
+		"   ":             "空白键应被跳过",
+	}
+	client := newTestClient(t, server, func(cfg *Config) { cfg.Header = header })
+	if _, err := client.GetStockList(context.Background(), GetStockListRequest{MarketType: "1"}); err != nil {
+		t.Fatalf("拉取失败: %v", err)
+	}
+
+	if v := got.Get("accept-language"); v != "zh-CN,zh;q=0.9,en;q=0.8" {
+		t.Fatalf("accept-language 未生效：%q", v)
+	}
+	if v := got.Get("accept"); v != "application/vnd.moomoo+json" {
+		t.Fatalf("accept 应被调用方覆盖：%q", v)
+	}
+	if v := got.Get("quote-token"); v == "" {
+		t.Fatal("内置头不应被自定义头清除")
+	}
+
+	// 浅拷贝：调用方后续修改不应影响客户端已生效的配置。
+	header["accept-language"] = "en-US"
+	if v := client.Config().Header["accept-language"]; v != "zh-CN,zh;q=0.9,en;q=0.8" {
+		t.Fatalf("Header 应被浅拷贝，实际 %q", v)
+	}
+	if len(header) != 3 {
+		t.Fatalf("调用方的 map 不应被增删，实际 %d 项", len(header))
+	}
+}
+
+// TestConfigHeaderNil 不传 Header 时行为与之前一致（内置头原样生效）。
+func TestConfigHeaderNil(t *testing.T) {
+	var got http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"code":0,"data":{"pagination":{},"list":[]}}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server, nil)
+	if _, err := client.GetStockList(context.Background(), GetStockListRequest{MarketType: "1"}); err != nil {
+		t.Fatalf("拉取失败: %v", err)
+	}
+	if got.Get("accept-language") != "" {
+		t.Fatalf("未配置时不应出现 accept-language，实际 %q", got.Get("accept-language"))
+	}
+	if v := got.Get("accept"); v != "application/json" {
+		t.Fatalf("内置 accept 期望 application/json，实际 %q", v)
+	}
+	if v := got.Get("user-agent"); v != DefaultUserAgent {
+		t.Fatalf("内置 user-agent 不符：%q", v)
+	}
+}
+
+// TestRefererSelection 来源页优先级：
+// Referers（市场覆盖） → Referer（全局覆盖） → DefaultReferers（市场默认） → DefaultReferer。
+func TestRefererSelection(t *testing.T) {
+	var gotReferer string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReferer = r.Header.Get("referer")
+		_, _ = w.Write([]byte(`{"code":0,"data":{"pagination":{},"list":[]}}`))
+	}))
+	defer server.Close()
+
+	// list=true 走列表接口（按市场选 referer）；false 走普通接口（只用全局默认）。
+	call := func(cfg Config, list bool, marketType string) string {
+		t.Helper()
+		// 只覆盖 referer / header 相关字段，保留测试服务器地址与固定时钟。
+		client := newTestClient(t, server, func(c *Config) {
+			c.Referer = cfg.Referer
+			c.Referers = cfg.Referers
+			c.Header = cfg.Header
+		})
+		if list {
+			if _, err := client.GetStockList(context.Background(), GetStockListRequest{MarketType: marketType}); err != nil {
+				t.Fatalf("拉取失败: %v", err)
+			}
+		} else if _, err := client.get(context.Background(), "/x", Params("marketType", marketType)); err != nil {
+			t.Fatalf("拉取失败: %v", err)
+		}
+		return gotReferer
+	}
+
+	cases := []struct {
+		name       string
+		cfg        Config
+		list       bool
+		marketType string
+		want       string
+	}{
+		{"零值配置默认取简体中文站首页", Config{}, false, "", DefaultReferer},
+		{"列表接口按市场取中文列表页", Config{}, true, "1", DefaultReferers["1"]},
+		{"未列出的市场回落默认值", Config{}, true, "9", DefaultReferer},
+		{"Referers 覆盖市场默认值", Config{Referers: map[string]string{"1": "https://example.com/m1"}}, true, "1", "https://example.com/m1"},
+		{"Referer 优先于市场默认值", Config{Referer: "https://example.com/global"}, true, "1", "https://example.com/global"},
+		{"Referers 优先于 Referer", Config{Referer: "https://example.com/global", Referers: map[string]string{"1": "https://example.com/m1"}}, true, "1", "https://example.com/m1"},
+		{"Referers 未命中的市场回落 Referer", Config{Referer: "https://example.com/global", Referers: map[string]string{"1": "https://example.com/m1"}}, true, "2", "https://example.com/global"},
+		{"Header 的 referer 优先级最高", Config{Header: map[string]string{"referer": "https://example.com/h"}}, true, "1", "https://example.com/h"},
+	}
+	for _, tc := range cases {
+		if got := call(tc.cfg, tc.list, tc.marketType); got != tc.want {
+			t.Errorf("%s：referer 期望 %q，实际 %q", tc.name, tc.want, got)
+		}
 	}
 }
