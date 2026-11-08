@@ -22,11 +22,11 @@ Meta External Impl —— 外部数据接口的 Go 实现集合。
 
 ## 作为依赖引用
 
-当前最新版本：**v0.1.0**（[Release 说明](https://github.com/acnxo/MetaExt/releases/tag/v0.1.0)）。
+当前最新版本：**v0.1.2**（[Release 说明](https://github.com/acnxo/MetaExt/releases/tag/v0.1.2)）。
 
 ```bash
 # 固定到某个版本（推荐给第三方生产依赖）
-go get github.com/acnxo/MetaExt@v0.1.0
+go get github.com/acnxo/MetaExt@v0.1.2
 
 # 跟随最新版本（仅适合尝鲜）
 go get github.com/acnxo/MetaExt@latest
@@ -63,7 +63,7 @@ go run ./_cmd/starter
 go build -o MetaExt ./_cmd/starter
 
 # 注入版本号
-go build -ldflags "-X main.version=v0.1.0" -o MetaExt ./_cmd/starter
+go build -ldflags "-X main.version=v0.1.2" -o MetaExt ./_cmd/starter
 ```
 
 ## 目录结构
