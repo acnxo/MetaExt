@@ -13,7 +13,7 @@
 | 路径 | `/quote-api/quote-v2/get-stock-list` |
 | operationId | `getStockList` |
 | 代码入口 | `Client.GetStockList`（`component/quote/moomoo/quoteapiv2` 包） |
-| 备注 | 列表顺序由服务端决定；页码从 1 开始，与部分同类接口从 0 起不同；需要其它顺序时由调用方排序。 |
+| 备注 | 列表顺序由服务端决定；**页码从 0 开始**，`page=0` 才是第一页；需要其它顺序时由调用方排序。 |
 
 ## 请求参数
 
@@ -26,7 +26,7 @@
 | `marketType` | 是 | string | 市场类型，原样透传 | `1` |
 | `plateType` | 否 | string | 板块类型；缺省时按默认值 `1` 补上 | `1` |
 | `rankType` | 否 | string | 排行类型；缺省时省略该键，由服务端决定默认排序 | `3` |
-| `page` | 否 | string | 页码，从 `1` 开始；缺省时省略，按第 1 页处理 | `1` |
+| `page` | 否 | string | 页码，**从 `0` 开始**（`0` 即第一页）；缺省时省略，按第 `0` 页处理；`-1` 等负数在本地被拒绝 | `0` |
 | `pageSize` | 否 | string | 每页数量；缺省时省略，服务端默认观测为 `50` | `50` |
 | `_` | 否 | string | 毫秒级时间戳；缺省时省略该键，不自动补当前时间 | `1781611867445` |
 
@@ -40,13 +40,41 @@
 | `quote-token` | 是 | 请求签名，10 个字符，生成方式见 [Signature.md](Signature.md) |
 | `futu-x-csrf-token` | 是 | CSRF 标记，该接口不校验取值但必须存在，且与 Cookie 中的 `csrfToken` 一致 |
 | `cookie` | 是 | 需包含 `csrfToken` 与 `locale` 两项，例如 `csrfToken=0000000000; locale=zh-cn` |
-| `referer` | 否 | 来源页，建议带上站点页面地址 |
+| `referer` | 否 | 来源页。**决定返回数据的语言与数值单位口径**：简体中文站（`/hans/`）返回中文名与 `万亿/亿/万`，站点根路径返回英文名与 `T/B/M/K`。默认取对应市场的简体中文列表页（见下） |
 | `user-agent` | 否 | 浏览器 UA，非浏览器 UA 可能被拒绝 |
 | `accept` | 否 | 固定 `application/json` |
 
 ### 请求体
 
 `GET` 请求，无请求体，不发送 `content-type`。
+
+### 返回语言与自定义请求头
+
+服务端**只根据 `referer` 决定返回语言与数值单位**；`cookie` 里的 `locale` 与
+`accept-language` 实测都无效。因此本包默认把 `referer` 指向简体中文站的业务页面：
+
+| marketType | 默认 `referer` |
+| --- | --- |
+| `1`（港股） | `https://www.moomoo.com/hans/quote/hk/stock-list/all-hk-stocks/top-market-cap` |
+| `2`（美股） | `https://www.moomoo.com/hans/quote/us/stock-list/all-us-stocks/top-market-cap` |
+| `4`（沪深） | `https://www.moomoo.com/hans/quote/cn/stock-list/all-cn-stocks/top-market-cap` |
+| 其它 / 未命中 | `https://www.moomoo.com/hans/`（`DefaultReferer`） |
+
+覆盖顺序（越靠后优先级越高）：`DefaultReferer` → `DefaultReferers[marketType]` →
+`Config.Referer` → `Config.Referers[marketType]` → `Config.Header["referer"]`。需要补其它请求头（如 `accept-language`）时用 `Config.Header`：
+
+```go
+client := quoteapiv2.New(quoteapiv2.Config{
+	Header: map[string]string{"accept-language": "zh-CN,zh;q=0.9,en;q=0.8"},
+})
+// 只想改某些市场的来源页：
+client = quoteapiv2.New(quoteapiv2.Config{
+	Referers: map[string]string{"2": "https://www.moomoo.com/hans/quote/us/stock-list/all-us-stocks/top-market-cap"},
+})
+```
+
+`Config.Header` 在内置默认头（含 `referer`）之后逐项 `Set`，同名即覆盖；未设置时请求头
+与之前版本逐项一致。
 
 ## 签名规则
 
@@ -55,11 +83,14 @@
 本接口的签名输入为查询参数的紧凑 JSON（键序即参数顺序，值全部字符串化）。全参数示例：
 
 ```json
-{"marketType":"1","plateType":"1","rankType":"3","page":"1","pageSize":"50","_":"1781611867445"}
+{"marketType":"1","plateType":"1","rankType":"3","page":"0","pageSize":"50","_":"1781611867445"}
 ```
 
-对应 `quote-token = 6481798cf4`。只传必填参数时为
+对应 `quote-token = 34193eae90`。只传必填参数时为
 `{"marketType":"1","plateType":"1"}`，对应 `quote-token = 0fdcd3ce32`。
+
+> `page` 是该接口**唯一 0-based** 的分页语义差异点：传 `1` 会跳过第一页的 `pageSize` 条，
+> 按市值倒序采集时会恒定缺失前 `pageSize` 名（港股即腾讯、汇丰、阿里等）。
 
 ## 响应
 
@@ -85,7 +116,7 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `page` | integer | 当前页码，从 1 开始 |
+| `page` | integer | 当前页码，从 `0` 开始 |
 | `pageSize` | integer | 每页数量 |
 | `pageCount` | integer | 总页数 |
 | `total` | integer | 总条数，随行情变化 |
@@ -145,7 +176,7 @@ JSON tag 用接口原名。
   "code": 0,
   "message": "成功",
   "data": {
-    "pagination": {"page": 1, "pageSize": 50, "pageCount": 65, "total": 3228},
+    "pagination": {"page": 0, "pageSize": 50, "pageCount": 65, "total": 3228},
     "list": [
       {
         "stockId": 58531814313881,

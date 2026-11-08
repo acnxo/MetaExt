@@ -26,6 +26,10 @@
 | `GetHistoryCashTrend.md` | 本目录 | 同一接口的可读说明 |
 | `GetQuoteMinute.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-quote-minute` 的 OpenAPI 规格 |
 | `GetQuoteMinute.md` | 本目录 | 同一接口的可读说明 |
+| `GetFxRateList.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-fx-rate-list` 的 OpenAPI 规格 |
+| `GetFxRateList.md` | 本目录 | 同一接口的可读说明 |
+| `GetFxOverview.yaml` | `Meta/OpenAPI/MooMoo/QuoteAPIV2/` | `GET /quote-api/quote-v2/get-fx-overview` 的 OpenAPI 规格 |
+| `GetFxOverview.md` | 本目录 | 同一接口的可读说明 |
 | `Signature.md` | 本目录 | 请求签名 `quote-token` 的算法与校验向量，适用于本组全部接口 |
 
 ## 命名约定
@@ -34,7 +38,8 @@
   `get-kline` → `GetKLine`、`get-stock-list` → `GetStockList`、
   `get-option-quote` → `GetOptionQuote`、`get-news-list` → `GetNewsList`、
   `get-etf-list` → `GetEtfList`、`get-futures-list` → `GetFuturesList`、
-  `get-history-cash-trend` → `GetHistoryCashTrend`、`get-quote-minute` → `GetQuoteMinute`，
+  `get-history-cash-trend` → `GetHistoryCashTrend`、`get-quote-minute` → `GetQuoteMinute`、
+  `get-fx-rate-list` → `GetFxRateList`、`get-fx-overview` → `GetFxOverview`，
   分别对应同名客户端方法；
 - 新增接口时按同一规则分别添加 `.yaml` 与同名 `.md`：`.yaml` 放 `Meta/OpenAPI/` 下
   对应厂商与接口组目录，`.md` 放本目录。
@@ -59,6 +64,10 @@
   `CashTrendPage` 与代码同名。
 - 分时行情的 `QuoteMinuteResponse` 对应代码中的 `quoteMinutePayload`，`QuoteMinute`、
   `QuoteMinuteTick`、`QuoteMinuteSection` 与代码同名。
+- 汇率列表的 `FxRateListResponse` 对应代码中的 `fxRateListPayload`，`FxRateListItem` 与
+  `FxRateListPage` 与代码同名，`Pagination` 复用公共结构。
+- 汇率概览的 `FxOverviewResponse` 对应代码中的 `fxOverviewPayload`，`data` 解为以货币对代码
+  为键的 `map[string]FxOverviewQuote`。
 - 签名算法与校验向量见 `Signature.md`，不对应具体接口，同一目录下的接口共用。
 
 新增接口时，先补齐规格文档，再按同一命名规则实现客户端方法。

@@ -125,7 +125,7 @@ paths:
           description: 来源页，建议带上站点页面地址。
           schema:
             type: string
-            default: https://www.moomoo.com/
+            default: https://www.moomoo.com/hans/
         - name: user-agent
           in: header
           required: false
