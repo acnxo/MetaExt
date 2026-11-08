@@ -65,7 +65,7 @@ func (c *Client) GetEtfList(ctx context.Context, req GetEtfListRequest) (EtfList
 	}
 
 	path := c.cfg.EtfListPath
-	body, err := c.get(ctx, path, params)
+	body, err := c.getList(ctx, path, params)
 	if err != nil {
 		return EtfListPage{}, err
 	}

@@ -12,7 +12,7 @@ info:
     - 鉴权为请求头 quote-token 携带的签名，规则见本操作的 x-signature 扩展字段；
     - HTTP 状态码只表示传输层结果，业务结果一律看响应体的 code 字段；
     - 查询参数的书写顺序即签名输入的键序；可选参数缺省时整键省略，不要传空串；
-    - 页码从 1 开始，与部分同类接口从 0 起不同。
+    - 页码从 0 开始，0 即第一页；传 1 会跳过第一页的 pageSize 条。
 
 servers:
   - url: https://www.moomoo.com
@@ -65,11 +65,12 @@ paths:
           in: query
           required: false
           description: |
-            页码，从 1 开始。缺省时整键省略，服务端按第 1 页处理；传 0 属于越界取值。
+            页码，从 0 开始，0 即第一页。缺省时整键省略，服务端按第 0 页处理；
+            -1 等负数在客户端直接拒绝。
           schema:
             type: string
-            pattern: '^[1-9][0-9]*$'
-          example: "1"
+            pattern: '^(0|[1-9][0-9]*)$'
+          example: "0"
         - name: pageSize
           in: query
           required: false
@@ -112,10 +113,14 @@ paths:
         - name: referer
           in: header
           required: false
-          description: 来源页，需为站点页面地址。
+          description: |
+            来源页，需为站点页面地址。该值决定返回数据的语言与数值单位口径：
+            简体中文站（/hans/）返回中文名与 万亿/亿/万，站点根路径返回英文名与 T/B/M/K。
+            默认按 marketType 取对应的简体中文列表页（1/2/4），未命中回落到
+            https://www.moomoo.com/hans/ 。
           schema:
             type: string
-            default: https://www.moomoo.com/
+            default: https://www.moomoo.com/hans/
         - name: user-agent
           in: header
           required: false
@@ -137,8 +142,8 @@ paths:
           - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
           - 对第一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
         example:
-          input: '{"marketType":"1","plateType":"1","rankType":"3","page":"1","pageSize":"50","_":"1781611867445"}'
-          token: "6481798cf4"
+          input: '{"marketType":"1","plateType":"1","rankType":"3","page":"0","pageSize":"50","_":"1781611867445"}'
+          token: "34193eae90"
       responses:
         "200":
           description: |
@@ -160,7 +165,7 @@ paths:
                     message: 成功
                     data:
                       pagination:
-                        page: 1
+                        page: 0
                         pageSize: 50
                         pageCount: 65
                         total: 3228
@@ -241,12 +246,12 @@ components:
 
     Pagination:
       type: object
-      description: 分页元信息，页码从 1 开始。
+      description: 分页元信息，页码从 0 开始。
       properties:
         page:
           type: integer
-          description: 当前页码。
-          example: 1
+          description: 当前页码，0 即第一页。
+          example: 0
         pageSize:
           type: integer
           description: 每页数量。

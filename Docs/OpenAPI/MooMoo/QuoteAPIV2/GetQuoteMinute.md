@@ -44,7 +44,7 @@
 | `futu-x-csrf-token` | 是 | CSRF 标记，该接口不校验取值但必须存在，且与 Cookie 中的 `csrfToken` 一致 |
 | `cookie` | 是 | 需包含 `csrfToken` 与 `locale` 两项 |
 | `accept` | 否 | 固定 `application/json` |
-| `referer` | 否 | 来源页，建议带上站点页面地址 |
+| `referer` | 否 | 来源页；默认 `https://www.moomoo.com/hans/`；该值决定返回数据的语言与数值单位口径 |
 | `user-agent` | 否 | 浏览器 UA，非浏览器 UA 可能被拒绝 |
 
 ### 请求体

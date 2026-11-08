@@ -55,8 +55,12 @@ const (
 	DefaultOrigin = "https://www.moomoo.com"
 	// DefaultLocale Cookie 中的语言标记。
 	DefaultLocale = "zh-cn"
-	// DefaultReferer 请求来源页。
-	DefaultReferer = "https://www.moomoo.com/"
+	// DefaultReferer 默认请求来源页，简体中文站首页。
+	//
+	// 该值决定服务端返回数据的语言与数值单位口径，不只是「来源标识」：
+	// 站点根路径（https://www.moomoo.com/）返回英文名与 T/B/M/K 单位，
+	// 简体中文站（/hans/）返回中文名与 万亿/亿/万 单位。
+	DefaultReferer = "https://www.moomoo.com/hans/"
 	// DefaultUserAgent 浏览器 UA；站点对非浏览器 UA 可能直接拒绝。
 	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 	// DefaultTimeout 单次请求超时。
@@ -95,6 +99,16 @@ const (
 	// CashTrendTypeMonth 资金流水粒度：月。
 	CashTrendTypeMonth = "3"
 )
+
+// DefaultReferers 按市场类型（marketType）区分的默认来源页，取对应市场的简体中文列表页。
+//
+// 列表类接口请求会带 marketType，命中本表比 DefaultReferer 更贴近实际浏览页面；
+// 未列出的市场回落 DefaultReferer。key 为接口的 marketType 取值。
+var DefaultReferers = map[string]string{
+	"1": "https://www.moomoo.com/hans/quote/hk/stock-list/all-hk-stocks/top-market-cap",
+	"2": "https://www.moomoo.com/hans/quote/us/stock-list/all-us-stocks/top-market-cap",
+	"4": "https://www.moomoo.com/hans/quote/cn/stock-list/all-cn-stocks/top-market-cap",
+}
 
 // 业务错误码。
 const (
@@ -183,7 +197,23 @@ type Config struct {
 	// 实测该接口不校验该值，但请求中必须存在，故默认使用占位值。
 	CSRF string
 	// Locale Cookie 语言标记，默认 zh-cn。
+	//
+	// 注意：该值只写进 Cookie，实测不改变返回数据的语言；语言由 Referer 决定。
 	Locale string
+	// Referer 全局请求来源页；为空时依次回落 Referers（按市场）、
+	// DefaultReferers（按市场）、DefaultReferer。
+	//
+	// 注意：该值决定返回数据的语言与数值单位口径（中文站 /hans/ → 中文名与 万亿/亿/万）。
+	Referer string
+	// Referers 按市场类型（marketType）区分的来源页，优先于 Referer；
+	// 未命中时回落 Referer 与默认值。
+	Referers map[string]string
+	// Header 额外请求头；在内置默认头与 referer 之后逐项 Set，同名覆盖内置值。
+	//
+	// 键为空白时跳过；New 时做浅拷贝，调用方可安全复用同一个 map。
+	// quote-token 与 cookie 请优先用专用字段（CSRF / Locale），Header 仅作兼容扩展点，
+	// 覆盖它们会绕过本包对签名与 CSRF 的一致性保证。
+	Header map[string]string
 	// Timeout 单次请求超时，默认 20s。
 	Timeout time.Duration
 	// HTTPClient 可注入自定义客户端，主要用于测试与代理场景。
@@ -212,6 +242,21 @@ func (c Config) withDefaults() Config {
 	}
 	if strings.TrimSpace(c.Locale) == "" {
 		c.Locale = DefaultLocale
+	}
+	// 浅拷贝调用方提供的 map：避免其运行期修改导致数据竞争，也避免本包回写。
+	if len(c.Referers) > 0 {
+		referers := make(map[string]string, len(c.Referers))
+		for key, value := range c.Referers {
+			referers[key] = value
+		}
+		c.Referers = referers
+	}
+	if len(c.Header) > 0 {
+		header := make(map[string]string, len(c.Header))
+		for key, value := range c.Header {
+			header[key] = value
+		}
+		c.Header = header
 	}
 	if c.Timeout <= 0 {
 		c.Timeout = DefaultTimeout
@@ -279,21 +324,33 @@ func New(cfg Config) *Client {
 func (c *Client) Config() Config { return c.cfg }
 
 // get 按有序参数向指定路径发一次 GET 请求；签名输入为查询参数。
+//
+// referer 取全局默认值（含 Config.Referer / Config.Header 覆盖）；列表类接口请用 getList。
 func (c *Client) get(ctx context.Context, path string, params []Param) ([]byte, error) {
-	return c.do(ctx, http.MethodGet, path, params, nil, SignParams(params))
+	return c.do(ctx, http.MethodGet, path, params, nil, SignParams(params), "")
+}
+
+// getList 与 get 相同，但 referer 按 marketType 选择对应市场的列表页。
+//
+// 列表类接口（股票 / ETF / 期货）的请求参数含 marketType，命中
+// DefaultReferers / Config.Referers 比通用来源页更贴近真实浏览页面，
+// 服务端据此决定返回数据的语言与数值单位口径。
+func (c *Client) getList(ctx context.Context, path string, params []Param) ([]byte, error) {
+	return c.do(ctx, http.MethodGet, path, params, nil, SignParams(params), marketTypeParam(params))
 }
 
 // post 向指定路径发一次 POST 请求；签名输入为请求体的原始字节。
 //
 // body 必须是最终要发送的紧凑 JSON：签名对字节逐字敏感，签名后不得再格式化。
 func (c *Client) post(ctx context.Context, path string, body []byte) ([]byte, error) {
-	return c.do(ctx, http.MethodPost, path, nil, body, Sign(string(body)))
+	return c.do(ctx, http.MethodPost, path, nil, body, Sign(string(body)), "")
 }
 
 // do 按给定方法发一次请求并返回响应体；非 200 视为失败。
 //
 // token 由调用方计算：GET 走查询参数签名，POST 走请求体签名，本方法不区分。
-func (c *Client) do(ctx context.Context, method, path string, query []Param, body []byte, token string) ([]byte, error) {
+// refererMarket 非空时优先用对应市场的来源页；为空时用全局默认值。
+func (c *Client) do(ctx context.Context, method, path string, query []Param, body []byte, token string, refererMarket string) ([]byte, error) {
 	target := c.cfg.BaseURL + path
 	if len(query) > 0 {
 		target = c.url(path, query)
@@ -310,12 +367,14 @@ func (c *Client) do(ctx context.Context, method, path string, query []Param, bod
 	req.Header.Set("futu-x-csrf-token", c.cfg.CSRF)
 	req.Header.Set("cookie", fmt.Sprintf("csrfToken=%s; locale=%s", c.cfg.CSRF, c.cfg.Locale))
 	req.Header.Set("accept", "application/json")
-	req.Header.Set("referer", DefaultReferer)
+	req.Header.Set("referer", c.refererFor(refererMarket))
 	req.Header.Set("user-agent", DefaultUserAgent)
 	if method == http.MethodPost {
 		req.Header.Set("content-type", "application/json")
 		req.Header.Set("origin", DefaultOrigin)
 	}
+	// 扩展头最后应用：同名覆盖内置值（含 referer），调用方显式值优先。
+	c.applyHeader(req)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -338,6 +397,47 @@ func (c *Client) do(ctx context.Context, method, path string, query []Param, bod
 // url 拼接完整请求地址。
 func (c *Client) url(path string, params []Param) string {
 	return c.cfg.BaseURL + path + "?" + SignedQuery(params)
+}
+
+// refererFor 按「市场覆盖 → 全局覆盖 → 市场默认 → 全局默认」选择来源页。
+//
+// Config.Header 中的 referer 名不在此处理，它在所有内置头之后覆盖本方法的返回值。
+func (c *Client) refererFor(marketType string) string {
+	if marketType != "" {
+		if value := strings.TrimSpace(c.cfg.Referers[marketType]); value != "" {
+			return value
+		}
+	}
+	if value := strings.TrimSpace(c.cfg.Referer); value != "" {
+		return value
+	}
+	if marketType != "" {
+		if value := strings.TrimSpace(DefaultReferers[marketType]); value != "" {
+			return value
+		}
+	}
+	return DefaultReferer
+}
+
+// applyHeader 应用 Config.Header：同名覆盖内置头，键为空白时跳过。
+func (c *Client) applyHeader(req *http.Request) {
+	for key, value := range c.cfg.Header {
+		name := strings.TrimSpace(key)
+		if name == "" {
+			continue
+		}
+		req.Header.Set(name, value)
+	}
+}
+
+// marketTypeParam 从有序查询参数中取出 marketType，供选择 referer 使用。
+func marketTypeParam(params []Param) string {
+	for _, p := range params {
+		if p.Name == "marketType" {
+			return strings.TrimSpace(p.Value)
+		}
+	}
+	return ""
 }
 
 // decode 检查业务码；非成功时按服务端返回的 message 构造错误，成功时返回 nil。
