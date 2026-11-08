@@ -1,0 +1,342 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-fx-rate-list
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-fx-rate-list` 的 HTTP 规格：按清单分组获取外汇与
+    贵金属汇率列表，每条含最新价、买卖盘、开高低与涨跌，支持分页。
+
+    与其他列表接口的差异：
+
+    - 页码从 **0** 开始（0 即第 1 页）；
+    - 四个参数都有服务端默认值，实现中缺省时显式补默认值并参与签名；
+    - `listId=0` 会返回 `code=3`，前端 store 中的 0 只是「未选择」占位值；
+    - 价格按各货币对精度格式化为字符串（USDJPY 3 位、USDCNY 4 位、EURUSD 5 位），
+      涨跌幅与振幅是服务端已格式化的百分比文本，均不应在解析阶段转数值。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: FxRateList
+    description: 汇率列表
+
+paths:
+  /quote-api/quote-v2/get-fx-rate-list:
+    get:
+      tags:
+        - FxRateList
+      operationId: getFxRateList
+      summary: 按清单分组拉取汇率列表
+      description: |
+        返回指定清单分组下的汇率条目，支持分页。同一 listId 下顺序稳定，调用方如需
+        其它顺序应自行排序。
+      parameters:
+        - name: listId
+          in: query
+          required: false
+          description: |
+            清单分组 ID，缺省时补默认值 "1"（全部汇率，观测 total=282）。
+
+            - 1 / 10 / 11 / 12：前端路由 all-forex、Europe&Americas、Asia-Pacific、others；
+            - 2~9：可返回数据，但前端没有对应路由；标签为按返回成分归纳；
+            - 0：服务端返回 code=3，不要使用。
+          schema:
+            type: string
+            default: "1"
+          example: "1"
+        - name: page
+          in: query
+          required: false
+          description: |
+            页码，从 0 开始（0 即第 1 页）。缺省时补默认值 "0"；越界页返回 code=0、
+            空 list，且 data.listId 缺失。
+          schema:
+            type: string
+            default: "0"
+            pattern: '^(0|[1-9][0-9]*)$'
+          example: "0"
+        - name: pageSize
+          in: query
+          required: false
+          description: |
+            每页数量，缺省时补默认值 "50"。精确上限未逐值定位：观测 300 可用、
+            500 返回 code=500。
+          schema:
+            type: string
+            default: "50"
+            pattern: '^[1-9][0-9]*$'
+          example: "50"
+        - name: "_"
+          in: query
+          required: false
+          description: |
+            毫秒级 UNIX 时间戳，用于防缓存并参与签名。缺省时整键省略，不自动补当前时间。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1793831403000"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            CSRF 标记。该接口观测到不校验其取值，但按既有约定仍需携带，
+            且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: referer
+          in: header
+          required: false
+          description: |
+            来源页，需为站点页面地址；影响返回数据的语言与数值单位口径，默认取简体中文站
+            https://www.moomoo.com/hans/ 。
+          schema:
+            type: string
+            default: https://www.moomoo.com/hans/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        examples:
+          - input: '{"listId":"1","page":"0","pageSize":"50","_":"1793831403000"}'
+            token: "71a7397b8b"
+          - input: '{"listId":"11","page":"2","pageSize":"20","_":"1793859759000"}'
+            token: "116547b41a"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，分组在 data.listId，分页在 data.pagination，条目在 data.list；
+            - `-403`：签名被拒，检查键序是否为 listId → page → pageSize → _；
+            - `3`：清单分组不可用（如 listId=0），message 为 [srpc异常]；
+            - `500`：参数错误，如 pageSize 过大。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxRateListResponse"
+              examples:
+                success:
+                  summary: 成功（page=0，listId=1）
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      listId: "1"
+                      list:
+                        - stockId: 72000027
+                          stockCode: EURUSD
+                          marketLabel: FX
+                          instrumentType: 10
+                          name: EUR/USD
+                          priceDirect: flat
+                          priceNominal: "1.12286"
+                          changeAmount: "-0.00001"
+                          changePercent: "0.00%"
+                          priceBid: "1.12269"
+                          priceBidDirect: down
+                          priceAsk: "1.12303"
+                          priceAskDirect: up
+                          priceOpen: "1.12287"
+                          priceLastClose: "1.12287"
+                          priceHighest: "1.12291"
+                          priceLowest: "1.12266"
+                          amplitudePrice: "0.02%"
+                      pagination:
+                        page: 0
+                        pageSize: 50
+                        pageCount: 6
+                        total: 282
+                outOfRange:
+                  summary: 页码越界（listId 缺失）
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      list: []
+                      pagination:
+                        page: 99
+                        pageSize: 50
+                        pageCount: 6
+                        total: 282
+                listIdZero:
+                  summary: listId=0 服务端异常
+                  value:
+                    code: 3
+                    message: "[srpc异常] 获取行情列表服务异常"
+                    data: null
+
+components:
+  schemas:
+    FxRateListResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          allOf:
+            - $ref: "#/components/schemas/FxRateListData"
+          description: 业务数据，失败时可能为 null。
+
+    FxRateListData:
+      type: object
+      properties:
+        listId:
+          type: string
+          description: 服务端回显的清单分组 ID；页码越界时该字段缺失。
+          example: "1"
+        list:
+          type: array
+          description: 当前页的汇率条目；越界页为空数组。
+          items:
+            $ref: "#/components/schemas/FxRateListItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    FxRateListItem:
+      type: object
+      description: |
+        汇率条目。价格、涨跌、买卖盘与振幅一律为字符串：小数位随货币对精度变化，
+        百分比是服务端已格式化的文本，统一按字符串保留。
+      required:
+        - stockId
+        - stockCode
+      properties:
+        stockId:
+          type: integer
+          format: int64
+          description: 证券内部 ID，外汇标的集中在 72000000 段。
+          example: 72000027
+        stockCode:
+          type: string
+          description: 货币对代码；指数类为 USDindex、EURindex。
+          example: EURUSD
+        marketLabel:
+          type: string
+          description: 市场标签，外汇固定为 FX。
+          example: FX
+        instrumentType:
+          type: integer
+          description: 证券类型，外汇固定为 10。
+          example: 10
+        name:
+          type: string
+          description: 展示名称，如 EUR/USD；指数类为 USD、Euro。
+          example: EUR/USD
+        priceDirect:
+          type: string
+          description: 最新价涨跌方向，up / down / flat。
+          enum:
+            - up
+            - down
+            - flat
+          example: flat
+        priceNominal:
+          type: string
+          description: 最新价，小数位随货币对精度变化。
+          example: "1.12286"
+        changeAmount:
+          type: string
+          description: 涨跌额，带符号。
+          example: "-0.00001"
+        changePercent:
+          type: string
+          description: 涨跌幅，含百分号。
+          example: "0.00%"
+        priceBid:
+          type: string
+          description: 买盘价。
+          example: "1.12269"
+        priceBidDirect:
+          type: string
+          description: 买盘价方向，up / down / flat。
+          example: down
+        priceAsk:
+          type: string
+          description: 卖盘价。
+          example: "1.12303"
+        priceAskDirect:
+          type: string
+          description: 卖盘价方向，up / down / flat。
+          example: up
+        priceOpen:
+          type: string
+          description: 今开。
+          example: "1.12287"
+        priceLastClose:
+          type: string
+          description: 昨收。
+          example: "1.12287"
+        priceHighest:
+          type: string
+          description: 今日最高。
+          example: "1.12291"
+        priceLowest:
+          type: string
+          description: 今日最低。
+          example: "1.12266"
+        amplitudePrice:
+          type: string
+          description: 振幅，含百分号。
+          example: "0.02%"
+
+    Pagination:
+      type: object
+      description: 分页元信息，页码从 0 开始。
+      properties:
+        page:
+          type: integer
+          description: 当前页码，0 即第 1 页。
+          example: 0
+        pageSize:
+          type: integer
+          description: 每页数量。
+          example: 50
+        pageCount:
+          type: integer
+          description: 总页数。
+          example: 6
+        total:
+          type: integer
+          description: 总条数，随服务端货币对增删变化。
+          example: 282
