@@ -221,7 +221,33 @@ func TestGetStockListEmptyMarketType(t *testing.T) {
 	}
 }
 
-// TestGetStockListInvalidPaging 页码与每页数量必须是不小于 1 的整数。
+// TestGetStockListPageZero 该接口页码 0-based：page=0 必须能发出请求并出现在查询串里。
+func TestGetStockListPageZero(t *testing.T) {
+	var gotQuery map[string]string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, gotQuery = splitQuery(r.URL.RawQuery)
+		_, _ = w.Write([]byte(`{"code":0,"data":{"pagination":{"page":0,"pageSize":50},"list":[]}}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server, nil)
+	page, err := client.GetStockList(context.Background(), GetStockListRequest{
+		MarketType: "1",
+		Page:       "0",
+		PageSize:   "50",
+	})
+	if err != nil {
+		t.Fatalf("page=0 应被接受，实际报错：%v", err)
+	}
+	if gotQuery["page"] != "0" {
+		t.Fatalf("查询串应含 page=0，实际 %v", gotQuery)
+	}
+	if page.Pagination.Page != 0 {
+		t.Fatalf("分页 page 期望 0，实际 %d", page.Pagination.Page)
+	}
+}
+
+// TestGetStockListInvalidPaging 页码须不小于 0（0 即第一页），每页数量须不小于 1。
 func TestGetStockListInvalidPaging(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("非法分页参数不应发起请求")
@@ -230,7 +256,7 @@ func TestGetStockListInvalidPaging(t *testing.T) {
 
 	client := newTestClient(t, server, nil)
 	cases := []GetStockListRequest{
-		{MarketType: "1", Page: "0"},
+		{MarketType: "1", Page: "-1"},
 		{MarketType: "1", Page: "abc"},
 		{MarketType: "1", PageSize: "0"},
 		{MarketType: "1", PageSize: "-5"},

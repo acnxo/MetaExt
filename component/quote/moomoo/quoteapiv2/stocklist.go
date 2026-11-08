@@ -18,7 +18,7 @@ type GetStockListRequest struct {
 	PlateType string
 	// RankType 排行类型，为空则省略该参数，由服务端决定默认排序。
 	RankType string
-	// Page 页码，从 1 开始；为空则省略，服务端按第 1 页处理。
+	// Page 页码，从 0 开始（0 即第一页）；为空则省略，服务端按第 0 页处理。
 	Page string
 	// PageSize 每页数量；为空则省略，服务端使用默认值（观测为 50）。
 	PageSize string
@@ -26,7 +26,7 @@ type GetStockListRequest struct {
 	TimestampMillis string
 }
 
-// Pagination 分页元信息。页码从 1 开始，与本接口一致。
+// Pagination 分页元信息。页码从 0 开始，与本接口一致。
 type Pagination struct {
 	// Page 当前页码。
 	Page int `json:"page"`
@@ -180,7 +180,7 @@ type stockListItem struct {
 
 // GetStockList 按市场与板块拉取股票列表（对应 get-stock-list 接口）。
 //
-// 支持排行榜排序与分页，页码从 1 开始。页内条目按服务端给出的顺序返回，
+// 支持排行榜排序与分页，页码从 0 开始，0 即第一页（传 1 会跳过第一页的 pageSize 条）。页内条目按服务端给出的顺序返回，
 // 本方法不做额外排序。
 func (c *Client) GetStockList(ctx context.Context, req GetStockListRequest) (StockListPage, error) {
 	marketType := strings.TrimSpace(req.MarketType)
@@ -200,7 +200,7 @@ func (c *Client) GetStockList(ctx context.Context, req GetStockListRequest) (Sto
 	if value := strings.TrimSpace(req.RankType); value != "" {
 		params = append(params, Param{Name: "rankType", Value: value})
 	}
-	page, err := intParam(req.Page, "page", 1)
+	page, err := intParam(req.Page, "page", 0)
 	if err != nil {
 		return StockListPage{}, err
 	}
@@ -220,7 +220,7 @@ func (c *Client) GetStockList(ctx context.Context, req GetStockListRequest) (Sto
 	}
 
 	path := c.cfg.StockListPath
-	body, err := c.get(ctx, path, params)
+	body, err := c.getList(ctx, path, params)
 	if err != nil {
 		return StockListPage{}, err
 	}
