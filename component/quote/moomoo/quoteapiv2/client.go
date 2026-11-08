@@ -211,6 +211,8 @@ type Config struct {
 	// Header 额外请求头；在内置默认头与 referer 之后逐项 Set，同名覆盖内置值。
 	//
 	// 键为空白时跳过；New 时做浅拷贝，调用方可安全复用同一个 map。
+	// quote-token 与 cookie 请优先用专用字段（CSRF / Locale），Header 仅作兼容扩展点，
+	// 覆盖它们会绕过本包对签名与 CSRF 的一致性保证。
 	Header map[string]string
 	// Timeout 单次请求超时，默认 20s。
 	Timeout time.Duration
