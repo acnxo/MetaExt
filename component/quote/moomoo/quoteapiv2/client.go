@@ -1,7 +1,9 @@
 // Package quoteapiv2 封装 moomoo（富途）网页行情接口 /quote-api/quote-v2/*。
 //
 // 本包只做「HTTP 协议 → 统一结构」的转换，不涉及存储与业务编排，结果交给调用方
-// 自行处理。当前实现 get-kline 与 get-stock-list 两个接口，其余接口可按同样的方式在
+// 自行处理。当前实现 get-kline、get-stock-list、get-option-quote、get-news-list、
+// get-etf-list、get-futures-list、get-history-cash-trend、get-quote-minute、
+// get-fx-rate-list、get-fx-overview 十个接口，其余接口可按同样的方式在
 // Client 上扩展：构造有序参数、签名、发请求、解析响应四步。
 //
 // 对外方法名与接口路径保持映射关系：取路径末段按驼峰命名，例如 /quote-api/quote-v2/
@@ -51,6 +53,10 @@ const (
 	DefaultHistoryCashTrendPath = "/quote-api/quote-v2/get-history-cash-trend"
 	// DefaultQuoteMinutePath 分钟级分时行情接口路径。
 	DefaultQuoteMinutePath = "/quote-api/quote-v2/get-quote-minute"
+	// DefaultFxRateListPath 汇率列表接口路径。
+	DefaultFxRateListPath = "/quote-api/quote-v2/get-fx-rate-list"
+	// DefaultFxOverviewPath 汇率概览接口路径。
+	DefaultFxOverviewPath = "/quote-api/quote-v2/get-fx-overview"
 	// DefaultOrigin POST 请求的 Origin 头。
 	DefaultOrigin = "https://www.moomoo.com"
 	// DefaultLocale Cookie 中的语言标记。
@@ -91,6 +97,12 @@ const (
 	DefaultFuturesPageSize = "40"
 	// DefaultCashTrendBaseTime 资金流水接口的分页基准时间戳默认值，0 表示最新一段。
 	DefaultCashTrendBaseTime = "0"
+	// DefaultFxListID 汇率列表接口的清单分组默认值（全部汇率，观测 282 条）。
+	DefaultFxListID = "1"
+	// DefaultFxRatePage 汇率列表接口的页码默认值；该接口页码从 0 开始。
+	DefaultFxRatePage = "0"
+	// DefaultFxRatePageSize 汇率列表接口的每页数量默认值；观测 300 可用、500 报错。
+	DefaultFxRatePageSize = "50"
 
 	// CashTrendTypeDay 资金流水粒度：日。
 	CashTrendTypeDay = "1"
@@ -193,6 +205,10 @@ type Config struct {
 	HistoryCashTrendPath string
 	// QuoteMinutePath 分钟级分时行情接口路径，默认 DefaultQuoteMinutePath。
 	QuoteMinutePath string
+	// FxRateListPath 汇率列表接口路径，默认 DefaultFxRateListPath。
+	FxRateListPath string
+	// FxOverviewPath 汇率概览接口路径，默认 DefaultFxOverviewPath。
+	FxOverviewPath string
 	// CSRF 对应请求头 futu-x-csrf-token 与 Cookie 中的 csrfToken。
 	// 实测该接口不校验该值，但请求中必须存在，故默认使用占位值。
 	CSRF string
@@ -236,6 +252,8 @@ func (c Config) withDefaults() Config {
 	c.FuturesListPath = normalizePath(c.FuturesListPath, DefaultFuturesListPath)
 	c.HistoryCashTrendPath = normalizePath(c.HistoryCashTrendPath, DefaultHistoryCashTrendPath)
 	c.QuoteMinutePath = normalizePath(c.QuoteMinutePath, DefaultQuoteMinutePath)
+	c.FxRateListPath = normalizePath(c.FxRateListPath, DefaultFxRateListPath)
+	c.FxOverviewPath = normalizePath(c.FxOverviewPath, DefaultFxOverviewPath)
 	if strings.TrimSpace(c.CSRF) == "" {
 		// 服务端不校验，但请求头必须存在；用占位值避免误以为需要登录态。
 		c.CSRF = "0000000000"
