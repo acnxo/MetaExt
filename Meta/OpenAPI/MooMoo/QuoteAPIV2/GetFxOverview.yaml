@@ -1,0 +1,185 @@
+openapi: 3.0.3
+
+info:
+  title: moomoo 行情接口 get-fx-overview
+  version: 1.0.0
+  description: |
+    记录 `GET /quote-api/quote-v2/get-fx-overview` 的 HTTP 规格：一次返回 9 种货币两两
+    组合的 72 个货币对最新价，供网页端汇率换算器使用；无业务参数、无分页。
+
+    要点：
+
+    - 响应 `data` 不是列表，而是**以货币对代码为键的对象**（如 `USDCNH`）；
+    - 唯一查询参数 `_` 可省略；省略时请求不带查询串，**签名输入为空对象 `{}`**
+      （不是空串，两者 token 不同）；
+    - 货币对清单由服务端固定，无法按币种筛选；`data` 的键没有顺序语义。
+
+servers:
+  - url: https://www.moomoo.com
+    description: 正式站点
+
+tags:
+  - name: FxOverview
+    description: 汇率概览
+
+paths:
+  /quote-api/quote-v2/get-fx-overview:
+    get:
+      tags:
+        - FxOverview
+      operationId: getFxOverview
+      summary: 拉取 72 个货币对的汇率概览
+      description: |
+        固定返回 9 种货币（CNH/HKD/USD/EUR/GBP/AUD/SGD/CAD/JPY）两两组合的 72 个货币对。
+        不含贵金属（XAUUSD/XAGUSD）与美元指数（USDindex/EURindex），这几类只在汇率列表
+        get-fx-rate-list 的分组中出现。
+      parameters:
+        - name: "_"
+          in: query
+          required: false
+          description: |
+            毫秒级 UNIX 时间戳，参与签名。已观测**可省略**：省略时 URL 不带查询串，
+            签名输入为空对象 `{}`。
+          schema:
+            type: string
+            pattern: '^[0-9]{13}$'
+          example: "1793859303524"
+        - name: quote-token
+          in: header
+          required: true
+          description: 请求签名，10 个字符，规则见 x-signature。
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 10
+        - name: futu-x-csrf-token
+          in: header
+          required: true
+          description: |
+            CSRF 标记。该接口观测到不校验其取值，但按既有约定仍需携带，
+            且与 Cookie 中的 csrfToken 一致。
+          schema:
+            type: string
+        - name: cookie
+          in: header
+          required: true
+          description: 需包含 csrfToken 与 locale 两项，如 `csrfToken=0000000000; locale=zh-cn`。
+          schema:
+            type: string
+        - name: referer
+          in: header
+          required: false
+          description: |
+            来源页，需为站点页面地址；影响返回数据的语言与数值单位口径，默认取简体中文站
+            https://www.moomoo.com/hans/ 。
+          schema:
+            type: string
+            default: https://www.moomoo.com/hans/
+        - name: user-agent
+          in: header
+          required: false
+          description: 浏览器 UA，非浏览器 UA 可能被拒绝。
+          schema:
+            type: string
+        - name: accept
+          in: header
+          required: false
+          description: 响应类型，固定取 application/json。
+          schema:
+            type: string
+      x-signature:
+        summary: quote-token 的生成方式
+        reference: Docs/OpenAPI/MooMoo/QuoteAPIV2/Signature.md
+        steps:
+          - 按查询参数出现顺序拼成紧凑 JSON，值一律字符串化。
+          - 无查询参数时签名输入为空对象 {}，不要用空串（空串会落到字面量 quote 的降级分支）。
+          - 以 quote_web 为密钥做 HMAC-SHA512，取十六进制结果前 10 个字符。
+          - 对上一步结果做 SHA-256，取十六进制结果前 10 个字符即为 quote-token。
+        examples:
+          - input: '{"_":"1793859303524"}'
+            token: "d1bea85060"
+          - input: '{}'
+            token: "279c67896d"
+      responses:
+        "200":
+          description: |
+            业务响应。HTTP 200 不代表业务成功，需检查 code：
+
+            - `0`：成功，货币对报价在 data 下以代码为键；
+            - `-403`：签名被拒（常见原因是把空参数算成了空串）；
+            - 其它非 0 值：业务失败，原因见 message。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxOverviewResponse"
+              examples:
+                success:
+                  summary: 成功（节选 4 个键，实际 72 个）
+                  value:
+                    code: 0
+                    message: 成功
+                    data:
+                      USDCNH:
+                        time: 1793859536104
+                        priceNominal: "6.66623"
+                        price: "6.66623"
+                      EURUSD:
+                        time: 1793859536488
+                        priceNominal: "1.12614"
+                        price: "1.12614"
+                      USDJPY:
+                        time: 1793859536470
+                        priceNominal: "157.971"
+                        price: "157.971"
+                      JPYUSD:
+                        time: 1793859509942
+                        priceNominal: "0.006330"
+                        price: "0.006330"
+                tokenRejected:
+                  summary: 签名被拒
+                  value:
+                    code: -403
+                    message: 非法请求
+                    data: null
+
+components:
+  schemas:
+    FxOverviewResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: 业务码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 业务提示，成功时通常为「成功」。
+          example: 成功
+        data:
+          type: object
+          description: |
+            以货币对代码（基础货币 + 报价货币，各 3 位大写）为键的对象，固定 72 个键。
+            键**没有顺序语义**，读取时按需取键。
+          additionalProperties:
+            $ref: "#/components/schemas/FxOverviewQuote"
+
+    FxOverviewQuote:
+      type: object
+      description: 单个货币对的最新报价。
+      properties:
+        time:
+          type: integer
+          format: int64
+          description: 报价时间，毫秒 UNIX 时间戳。
+          example: 1793859536104
+        priceNominal:
+          type: string
+          description: 最新价，小数位随货币对精度变化。
+          example: "6.66623"
+        price:
+          type: string
+          description: 最新价；已观测样本中与 priceNominal 始终相同，用途差异未验证。
+          example: "6.66623"
