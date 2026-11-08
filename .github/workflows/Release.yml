@@ -28,6 +28,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          # 项目当前无第三方依赖，没有 go.sum；用 go.mod 作为缓存键，避免缓存步骤告警。
+          cache-dependency-path: go.mod
 
       - name: 格式检查
         run: |
