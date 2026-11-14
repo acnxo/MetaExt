@@ -26,6 +26,9 @@ import (
 	"github.com/acnxo/MetaExt/component/quote/citics/xetapp"
 )
 
+// defaultTableRows 是表格模式的默认显示行数，避免全市场刷屏。
+const defaultTableRows = 20
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "错误："+err.Error())
@@ -41,7 +44,7 @@ func run() error {
 		pool    = flag.String("pool", "all", "池别名（all/sh_sz/hs300/zz500/zz2000/star50/gem/army）或内部代码")
 		fields  = flag.String("fields", "", "自定义字段码，逗号分隔，如 1,2,4,92；为空用默认 45 字段")
 		extra   = flag.String("extra", "", "在默认字段上追加的字段码，逗号分隔，如 341,372")
-		limit   = flag.Int("limit", 20, "最多输出条数，0 表示全部")
+		limit   = flag.Int("limit", -1, "最多输出条数：不传时 JSON 输出全部、表格显示前 20 行；0 表示全部")
 		maxRows = flag.Int("maxCount", xetapp.DefaultMaxCount, "请求的返回行数上限")
 		asJSON  = flag.Bool("json", false, "以 JSON 输出完整字段")
 		timeout = flag.Duration("timeout", 120*time.Second, "整体超时时间")
@@ -74,8 +77,17 @@ func run() error {
 		return err
 	}
 	rows := result.Rows
-	if *limit > 0 && len(rows) > *limit {
-		rows = rows[:*limit]
+	// 未指定 -limit 时按输出形态取默认：JSON 输出全部，表格只显示前 20 行避免刷屏。
+	showLimit := *limit
+	if showLimit < 0 {
+		if *asJSON {
+			showLimit = 0
+		} else {
+			showLimit = defaultTableRows
+		}
+	}
+	if showLimit > 0 && len(rows) > showLimit {
+		rows = rows[:showLimit]
 	}
 	if *asJSON {
 		return printJSON(result, rows)
@@ -150,6 +162,9 @@ func printTable(result *xetapp.SnapshotResult, rows []xetapp.Row, elapsed time.D
 	_ = w.Flush()
 	fmt.Printf("\n池 %s（%s）共 %d 只，本次输出 %d 只，耗时 %s\n",
 		result.PoolName, result.PoolCode, result.MaxCount, len(rows), elapsed.Round(time.Millisecond))
+	if len(rows) < len(result.Rows) {
+		fmt.Printf("仅显示前 %d 行，看完整数据用 -json 或 -limit 0\n", len(rows))
+	}
 	if result.HQDate != "" {
 		fmt.Printf("行情日期 %s\n", result.HQDate)
 	}
