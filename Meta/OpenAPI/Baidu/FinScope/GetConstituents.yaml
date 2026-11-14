@@ -1,0 +1,317 @@
+openapi: 3.0.3
+
+info:
+  title: 百度股市通接口 constituents
+  version: 1.0.0
+  description: |
+    记录 `GET /sapi/v1/constituents` 的 HTTP 规格：按指数或概念板块拉取成分股，
+    每条记录同时带该证券的行情快照，一次分页即可拿到「成分股 + 行情」。
+
+    翻页注意：`pn` 是**偏移量**而非页码，下一页必须 `pn += rn`；把 `pn` 当页码按
+    `pn += 1` 递进，每页只会新增 1 条，最终严重漏采。
+
+    响应字段与仓库其它接口的 `code` / `message` / `data` 惯例不同：百度原样返回
+    `QueryID` / `ResultCode` / `Result`，`ResultCode=0` 只表示网关正常处理，
+    业务成败一律看 `Result` 这一层。
+
+servers:
+  - url: https://finance.pae.baidu.com
+    description: 正式站点
+
+tags:
+  - name: Constituents
+    description: 成分股列表
+
+paths:
+  /sapi/v1/constituents:
+    get:
+      tags:
+        - Constituents
+      operationId: getConstituents
+      summary: 按指数或板块拉取成分股
+      description: |
+        返回指定来源的成分股列表，按 `sortKey` 排序后分页。无翻页游标：以返回条数
+        小于 `rn` 判定末页。偏移量越界时 `Result.list` 为 `{}` 或 `body` 为空数组。
+        参数顺序不影响结果（接口不签名）。
+      parameters:
+        - name: financeType
+          in: query
+          required: true
+          description: 成分类型，`index` 指数、`block` 概念 / 行业板块。
+          schema:
+            type: string
+            enum: [index, block]
+          example: index
+        - name: market
+          in: query
+          required: true
+          description: |
+            市场编码：`ab` A 股 / `hk` 港股 / `us` 美股，与 `getquotation` 系列的
+            `market_type` 取值同一套。目前只验证了 A 股。
+          schema:
+            type: string
+            enum: [ab, hk, us]
+          example: ab
+        - name: code
+          in: query
+          required: true
+          description: |
+            来源标识码，格式随 `market` 变化：A 股指数为 6 位代码（`000300` 沪深300、
+            `000001` 上证综指、`399106` 深证综指、`399380` 国证ETF），
+            板块为 `GNxxxx`（`GN2309` 北交所上市企业、`GN2282` 微盘股概念）。
+          schema:
+            type: string
+          example: "000300"
+        - name: sortKey
+          in: query
+          required: true
+          description: 排序字段，`marketValue` 总市值、`amount` 成交额。
+          schema:
+            type: string
+            enum: [marketValue, amount]
+          example: marketValue
+        - name: sortType
+          in: query
+          required: true
+          description: 排序方向。
+          schema:
+            type: string
+            enum: [desc, asc]
+          example: desc
+        - name: style
+          in: query
+          required: true
+          description: 返回样式，固定 `tablelist`（表格结构）。
+          schema:
+            type: string
+            enum: [tablelist]
+          example: tablelist
+        - name: pn
+          in: query
+          required: true
+          description: |
+            **偏移量**，首屏为 `0`，下一页 `pn += rn`。不是页码。
+          schema:
+            type: integer
+            minimum: 0
+          example: 0
+        - name: rn
+          in: query
+          required: true
+          description: |
+            单页条数，常用 `500`。实测 `rn=5000` 时一次返回该来源全部 2236 条，
+            没有 500 硬上限。
+          schema:
+            type: integer
+          example: 500
+        - name: finClientType
+          in: query
+          required: true
+          description: 客户端类型，固定 `pc`。
+          schema:
+            type: string
+            enum: [pc]
+          example: pc
+      responses:
+        '200':
+          description: HTTP 200；业务成败看 `Result` 一层
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstituentsResponse'
+              example:
+                QueryID: "12457052143672835826"
+                ResultCode: 0
+                Result:
+                  list:
+                    headers:
+                      - canSort: 1
+                        key: lastPx
+                        name: 最新价
+                    body:
+                      - code: "601939"
+                        name: 建设银行
+                        exchange: SH
+                        market: ab
+                        financeType: stock
+                        hasQuote: 1
+                        lastPx: "12.11"
+                        pxChange: "+0.10"
+                        pxChangeRate: "+0.83%"
+                        volume: 128万手
+                        amount: 15.42亿
+                        turnoverRatio: "1.33%"
+                        marketValue: 3.17万亿
+                        rawData:
+                          lastPx: 12.11
+                          pxChange: 0.1
+                          pxChangeRate: 0.83
+                          volume: 1276070.86
+                          amount: 1542319057
+                          turnoverRatio: 1.33
+                          marketValue: 3167980619468
+                        block:
+                          code: "480200"
+                          name: 国有大型银行Ⅱ
+                          market: ab
+                          financeType: block
+                        logo:
+                          type: normal
+                          logo: https://baidu-finance.cdn.bcebos.com/imgs/logo/stocks/stock_ab_601939.svg
+                        pcUrl: https://finance.baidu.com/stock/ab-601939
+                  pcUrl: https://finance.baidu.com/index/ab-000300?mainTab=成分股
+      x-todo:
+        - 港股 / 美股（`market=hk|us`）的成分股未实测
+        - "`ResultCode` 非 0 时的结构未取得样本"
+
+components:
+  schemas:
+    ConstituentsResponse:
+      type: object
+      required: [QueryID, ResultCode, Result]
+      properties:
+        QueryID:
+          type: string
+          description: 请求追踪 ID，仅用于排障。
+        ResultCode:
+          type: integer
+          description: 网关层结果，`0` 表示请求被正常处理，不代表业务成功。
+        Result:
+          $ref: '#/components/schemas/ConstituentsResult'
+    ConstituentsResult:
+      type: object
+      description: 业务数据；实测该接口不返回 `ResultNum`。
+      properties:
+        list:
+          $ref: '#/components/schemas/ConstituentsList'
+        pcUrl:
+          type: string
+          description: 该指数的 PC 页面地址，采集可忽略。
+        url_xcx_params:
+          type: object
+          description: 小程序跳转参数，采集可忽略。
+        webStatusUrl:
+          type: string
+          description: 小程序页面地址，无采集价值。
+    ConstituentsList:
+      type: object
+      description: 表格数据容器；偏移量越界时为空对象或 `body` 为空数组。
+      properties:
+        headers:
+          type: array
+          description: 列定义。
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              name:
+                type: string
+              canSort:
+                type: integer
+                description: 是否可排序，`1` / `0`。
+        body:
+          type: array
+          description: 成分股数组。
+          items:
+            $ref: '#/components/schemas/Constituent'
+    Constituent:
+      type: object
+      description: |
+        成分股条目。同一指标有两份：顶层带单位的展示字符串（给人看）与 `rawData` 中的
+        原始数值（给程序用），采集一律取 `rawData`。
+      properties:
+        code:
+          type: string
+          description: 证券代码，去重主键。
+        name:
+          type: string
+          description: 证券简称。
+        exchange:
+          type: string
+          description: 交易所，`SH` / `SZ` / `BJ`。
+        market:
+          type: string
+          description: 市场标识，取值同请求参数 `market`。
+        financeType:
+          type: string
+          description: 品种类型；本接口对股票与 ETF 都返回 `stock`。
+        hasQuote:
+          type: integer
+          description: 是否有行情，`1` / `0`。
+        lastPx:
+          type: string
+          description: 最新价（元），带符号的展示字符串。
+        pxChange:
+          type: string
+          description: 涨跌额（元），带符号。
+        pxChangeRate:
+          type: string
+          description: 涨跌幅（%），带 `%`。
+        volume:
+          type: string
+          description: 成交量，带中文单位（如 `128万手`）。
+        amount:
+          type: string
+          description: 成交额，带中文单位（如 `15.42亿`）。
+        turnoverRatio:
+          type: string
+          description: 换手率（%），带 `%`。
+        marketValue:
+          type: string
+          description: 总市值，带中文单位（如 `3.17万亿`）。
+        rawData:
+          $ref: '#/components/schemas/ConstituentRawData'
+        block:
+          type: object
+          description: 所属行业板块。
+          properties:
+            code:
+              type: string
+            name:
+              type: string
+            market:
+              type: string
+            financeType:
+              type: string
+        logo:
+          type: object
+          properties:
+            type:
+              type: string
+            logo:
+              type: string
+        pcUrl:
+          type: string
+          description: 个股 PC 页面地址，形如 `https://finance.baidu.com/stock/<market>-<code>`。
+        url_xcx_params:
+          type: object
+          description: 小程序跳转参数，采集可忽略。
+        webStatusUrl:
+          type: string
+          description: 小程序页面地址，可忽略。
+    ConstituentRawData:
+      type: object
+      description: 原始数值，未做单位换算；应以本对象为唯一数值来源，缺失时才回退到顶层字符串字段。
+      properties:
+        lastPx:
+          type: number
+          description: 元。
+        pxChange:
+          type: number
+          description: 元，可为负。
+        pxChangeRate:
+          type: number
+          description: 百分数，`0.83` 即 `+0.83%`。
+        volume:
+          type: number
+          description: 手。
+        amount:
+          type: number
+          description: 元。
+        turnoverRatio:
+          type: number
+          description: 百分数。
+        marketValue:
+          type: number
+          description: 元。
