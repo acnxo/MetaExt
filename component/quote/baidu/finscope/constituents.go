@@ -250,6 +250,8 @@ type ConstituentsPage struct {
 
 // GetConstituents 拉取一页成分股。
 //
+// 状态：已验证（用真实响应核对过结构与分页语义）。
+//
 // 偏移量越界时服务端返回空列表（`Result.list` 为 `{}` 或 `[]`），本方法如实返回
 // 空 Items 与 HasMore=false，不视为错误。
 //

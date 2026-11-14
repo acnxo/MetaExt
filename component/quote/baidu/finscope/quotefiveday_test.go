@@ -114,3 +114,36 @@ func TestGetQuoteFiveDayValidates(t *testing.T) {
 		t.Fatal("market_type 非法应返回错误")
 	}
 }
+
+// TestGetQuoteFiveDayTenColumns 覆盖真实响应里的 10 列形态：
+// 比文档记录的 7 列多出 avgPrice、totalVolume、totalAmount。
+func TestGetQuoteFiveDayTenColumns(t *testing.T) {
+	const sample = `{"ResultCode":0,"Result":{"newMarketData":{
+	  "headers":["时间戳","时间","价格","均价","涨跌额","涨跌幅","成交量","成交额","累积成交量","累积成交额"],
+	  "keys":["timestamp","time","price","avgPrice","range","ratio","volume","amount","totalVolume","totalAmount"],
+	  "marketData":[{"date":"2026-11-13","p":"1794553200,11-13 15:00,876.33,875.90,-31.80,-3.50,1234567,987654321.00,2345678,1876543210.00"}],
+	  "maxPoints":"1201","cx":["11-13"]}}}`
+	client, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, sample)
+	})
+	result, err := client.GetQuoteFiveDay(context.Background(), GetQuoteFiveDayRequest{Code: "899050"})
+	if err != nil {
+		t.Fatalf("10 列形态解析失败：%v", err)
+	}
+	if len(result.Days) != 1 || len(result.Days[0].Points) != 1 {
+		t.Fatalf("解析结果不足：%+v", result.Days)
+	}
+	point := result.Days[0].Points[0]
+	if point.Price != 876.33 || point.AvgPrice != 875.90 {
+		t.Errorf("价格/均价解析错误：%+v", point)
+	}
+	if point.Volume != 1234567 || point.Amount != 987654321 {
+		t.Errorf("量额解析错误：%+v", point)
+	}
+	if point.TotalVolume != 2345678 || point.TotalAmount != 1876543210 {
+		t.Errorf("累积量额解析错误：%+v", point)
+	}
+	if result.MaxPoints != "1201" || len(result.CX) != 1 {
+		t.Errorf("元信息不符：%+v", result)
+	}
+}

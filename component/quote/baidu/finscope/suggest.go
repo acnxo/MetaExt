@@ -78,6 +78,8 @@ func parseDisplayFloat(value string) (float64, bool) {
 
 // Suggest 用关键词搜索证券、指数与板块。
 //
+// 状态：已验证（用真实响应核对过结构）。
+//
 // 该接口不参与 getquotation 的风控，实测可用；返回结果中同名条目较多（指数、ETF、
 // 联接基金常常同名），调用方应按 Type 过滤后再取行情字段。
 func (c *Client) Suggest(ctx context.Context, wd string) ([]SuggestItem, error) {

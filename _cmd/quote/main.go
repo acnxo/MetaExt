@@ -43,8 +43,9 @@ func main() {
 
 func run() error {
 	var (
-		code     = flag.String("code", "", "证券或指数代码，如 899050（北证50）、920045")
-		kind     = flag.String("kind", "kline", "接口类型：kline K 线、fiveday 股票五日、forex 外汇分钟、futures 期货分钟、futures5d 期货五日")
+		code = flag.String("code", "", "证券或指数代码，如 899050（北证50）、920045")
+		kind = flag.String("kind", "kline", "接口类型：kline K 线、fiveday 股票五日、forex 外汇分钟、futures 期货分钟、futures5d 期货五日。"+
+			" 除 constituents / sug 外的行情接口在本机被站点风控 403，属已知待复测项")
 		wd       = flag.String("wd", "", "按名称搜索并输出行情快照，如 北证50；与 -code 二选一")
 		itemType = flag.String("type", "", "搜索时按类型过滤：index / stock / etf / block / fund")
 		market   = flag.String("marketType", finscope.MarketA, "市场：ab A 股、hk 港股、us 美股")

@@ -60,6 +60,8 @@ func (r GetQuoteFuturesMinuteRequest) params() []Param {
 
 // GetQuoteFuturesMinute 拉取期货合约的分钟行情。
 //
+// 状态：blocked —— 本机持续被站点风控 403，响应结构未取得样本。
+//
 // 响应结构**未验证**：本机对该 group 持续风控，Result 是否为 newMarketData 结构、
 // keys 是否含持仓量与结算价等期货特有字段，都需真实样本确认，故返回 RawQuoteResult。
 func (c *Client) GetQuoteFuturesMinute(ctx context.Context, req GetQuoteFuturesMinuteRequest) (*RawQuoteResult, error) {
@@ -124,6 +126,8 @@ func (r GetQuoteFuturesFiveDayRequest) params() []Param {
 }
 
 // GetQuoteFuturesFiveDay 拉取期货合约近五个交易日的分钟分时。
+//
+// 状态：blocked —— 本机持续被站点风控 403，响应结构未取得样本。
 //
 // 响应结构**未验证**：本机请求返回风控，且该接口风控时 QueryID 可能为 "0"。
 // 它与股票五日是否同为 newMarketData 结构、是否包含夜盘时段，都需真实样本确认，

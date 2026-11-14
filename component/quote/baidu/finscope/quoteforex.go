@@ -50,6 +50,8 @@ func (r GetQuoteForexMinuteRequest) params() []Param {
 
 // GetQuoteForexMinute 拉取货币对的分钟行情。
 //
+// 状态：blocked —— 本机持续被站点风控 403，响应结构未取得样本。
+//
 // 响应结构**未验证**：本机对该 group 持续返回风控，返回的是 RawQuoteResult，
 // 其 Result 为原始 JSON，字段含义待拿到真实样本后确认。不要把股票 K 线的
 // newMarketData 结构套到这里。

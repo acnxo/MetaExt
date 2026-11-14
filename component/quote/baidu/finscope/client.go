@@ -19,7 +19,9 @@
 package finscope
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -242,12 +244,38 @@ func (c *Client) get(ctx context.Context, path string, params []Param) ([]byte, 
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, &APIError{
+		apiErr := &APIError{
 			Path: path, URL: target, HTTPStatus: resp.StatusCode,
 			Body: truncate(string(body), errorBodyLimit),
 		}
+		// 风控时 HTTP 状态同样是 403，业务码在响应体里；识别出来让上层统一用
+		// IsRiskControl 判断，不必区分「HTTP 403」与「HTTP 200 + Result.code=403」两种形态。
+		if code, message, ok := parseRiskControlBody(body); ok {
+			apiErr.Code = code
+			apiErr.Message = message
+		}
+		return nil, apiErr
 	}
 	return body, nil
+}
+
+// parseRiskControlBody 从响应体中取出业务层风控标记。
+func parseRiskControlBody(body []byte) (int, string, bool) {
+	var envelope struct {
+		Result json.RawMessage `json:"Result"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return 0, "", false
+	}
+	raw := bytes.TrimSpace(envelope.Result)
+	if len(raw) == 0 || raw[0] != '{' {
+		return 0, "", false
+	}
+	var risk riskControl
+	if err := json.Unmarshal(raw, &risk); err != nil || risk.Code == 0 {
+		return 0, "", false
+	}
+	return risk.Code, risk.Message, true
 }
 
 // encodeQuery 按参数切片顺序拼接查询串。

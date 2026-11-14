@@ -140,6 +140,9 @@ type KLineResult struct {
 
 // GetQuoteKLine 拉取 K 线。
 //
+// 状态：blocked —— 请求参数已按文档构造，但本机持续被站点风控 403，字段解析只用文档样本的单测
+// 覆盖过。复测命令见 TestLive，通过后把 verification.go 里的状态改为 StatusVerified。
+//
 // 风控命中时返回 *APIError（Code=403），可用 IsRiskControl 判断；不会把风控响应当成空结果。
 func (c *Client) GetQuoteKLine(ctx context.Context, req GetQuoteKLineRequest) (*KLineResult, error) {
 	normalized, err := req.withDefaults()

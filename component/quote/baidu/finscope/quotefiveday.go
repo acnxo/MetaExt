@@ -64,6 +64,9 @@ func (r GetQuoteFiveDayRequest) params() []Param {
 }
 
 // FiveDayPoint 是五日分时里的一个分钟点。
+//
+// 列数由响应里的 `keys` 决定，实测为 10 列（文档记录的 7 列已过时，多出均价、累积成交量
+// 与累积成交额）。未识别的列保留在 Extra 中。
 type FiveDayPoint struct {
 	// Timestamp 秒级时间戳，接口原值。
 	Timestamp int64
@@ -71,6 +74,8 @@ type FiveDayPoint struct {
 	Time string
 	// Price 该分钟价格。
 	Price float64
+	// AvgPrice 该分钟均价（`avgPrice`），旧响应可能没有该列。
+	AvgPrice float64
 	// ChangePrice 涨跌额。
 	ChangePrice float64
 	// ChangeRatio 涨跌幅（百分数）。
@@ -79,6 +84,12 @@ type FiveDayPoint struct {
 	Volume float64
 	// Amount 成交额。
 	Amount float64
+	// TotalVolume 当日累积成交量（`totalVolume`）。
+	TotalVolume float64
+	// TotalAmount 当日累积成交额（`totalAmount`）。
+	TotalAmount float64
+	// Extra 未识别的列，键为 `keys` 中的原始字段名。
+	Extra map[string]string
 }
 
 // FiveDayItem 是一个交易日的分时点集合。
@@ -108,6 +119,9 @@ type FiveDayResult struct {
 }
 
 // GetQuoteFiveDay 拉取近五个交易日的分钟分时。
+//
+// 状态：blocked —— 本机持续被站点风控 403，解析逻辑用文档实测样本的单测覆盖；
+// 真机复测时重点确认 `p` 是否始终为字符串。
 //
 // 返回的分钟点按交易日分组。`time` 列不带年份，年份取自同组的 `date`；
 // 需要完整时间时把两者拼接，或直接用 Timestamp。
@@ -247,6 +261,8 @@ func buildFiveDayPoint(keys, fields []string) FiveDayPoint {
 			point.Time = value
 		case "price":
 			point.Price = parseFloat(value)
+		case "avgPrice":
+			point.AvgPrice = parseFloat(value)
 		case "range":
 			point.ChangePrice = parseFloat(value)
 		case "ratio":
@@ -255,6 +271,12 @@ func buildFiveDayPoint(keys, fields []string) FiveDayPoint {
 			point.Volume = parseFloat(value)
 		case "amount":
 			point.Amount = parseFloat(value)
+		case "totalVolume":
+			point.TotalVolume = parseFloat(value)
+		case "totalAmount":
+			point.TotalAmount = parseFloat(value)
+		default:
+			point.Extra = setExtra(point.Extra, key, value)
 		}
 	}
 	return point
