@@ -9,6 +9,7 @@
 | --- | --- | --- | --- |
 | [Region.md](Region.md) | `region` | 证券所属地区，25 个取值 | 现行 |
 | [MarketCode.md](MarketCode.md) | `market_code` | 内部市场代码，54 个取值 | 现行 |
+| [MarketLabel.md](MarketLabel.md) | `marketLabel` | 响应侧市场标签，14 个取值 | 现行 |
 | [Exchange.md](Exchange.md) | `exchange` | 主要交易平台代码，31 个取值 | 现行 |
 | [ListedExchange.md](ListedExchange.md) | `listed_exchange` | 具体上市交易所，49 个取值 | 现行 |
 | [CsMarket.md](CsMarket.md) | `cs_market` | 市场分类代码，29 个取值 | 现行 |
@@ -20,8 +21,9 @@
 
 字段之间的关系：`region` 是国家/地区维度；`cs_market` 是市场分类，与 `exchange` 多对一；
 `listed_exchange` 比 `exchange` 更细，用于区分同一市场内的子交易所；`market_code` 是内部编码，
-按品种划分；`currency_code` 是计价货币；`instrument_type` 与 `sub_instrument_type` 是品种类型，
-V2 版本重新归类并用 `主类型 * 1000 + 子类型编号` 统一编码。
+按品种划分；`marketLabel` 与 `market_type` 是同一份标的信息的响应侧与请求侧写法，`marketLabel`
+为字符串标签，`market_type` 为数字编号；`currency_code` 是计价货币；`instrument_type` 与
+`sub_instrument_type` 是品种类型，V2 版本重新归类并用 `主类型 * 1000 + 子类型编号` 统一编码。
 
 ## 统一结构
 
