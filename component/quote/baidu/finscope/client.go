@@ -35,6 +35,10 @@ const (
 	DefaultBaseURL = "https://finance.pae.baidu.com"
 	// DefaultConstituentsPath 成分股列表接口路径。
 	DefaultConstituentsPath = "/sapi/v1/constituents"
+	// DefaultQuotePath 行情接口路径，多个 group 共用。
+	DefaultQuotePath = "/vapi/v1/getquotation"
+	// DefaultSuggestPath 搜索接口路径，用于按名称查代码。
+	DefaultSuggestPath = "/vapi/v1/sug"
 	// DefaultReferer 默认来源页；百度按来源页判断请求是否来自浏览器。
 	DefaultReferer = "https://gushitong.baidu.com/"
 	// DefaultUserAgent 浏览器 UA；建议与真实浏览器一致，空 UA 或工具 UA 更易被风控。
@@ -44,6 +48,16 @@ const (
 	DefaultClientType = "pc"
 	// DefaultStyle 返回样式，固定 tablelist（表格结构）。
 	DefaultStyle = "tablelist"
+	// DefaultSrcID 来源标识，行情接口固定 5353。
+	DefaultSrcID = "5353"
+	// DefaultPointType 点位类型，固定 string，决定行情以字符串表格返回。
+	DefaultPointType = "string"
+	// GroupKLine getquotation 的 K 线分组。
+	GroupKLine = "quotation_kline_ab"
+	// GroupFiveDay getquotation 的股票五日分时分组。
+	GroupFiveDay = "quotation_fiveday_ab"
+	// DefaultKLineCount K 线默认条数，241 可覆盖一个交易日的分钟线。
+	DefaultKLineCount = 241
 	// DefaultPageSize 单页条数默认值。实测 rn=5000 可一次返回该来源全部 2236 条，
 	// 没有 500 硬上限。
 	DefaultPageSize = 500
@@ -108,6 +122,10 @@ type Config struct {
 	BaseURL string
 	// ConstituentsPath 成分股列表接口路径，默认 DefaultConstituentsPath。
 	ConstituentsPath string
+	// QuotePath 行情接口路径，默认 DefaultQuotePath。
+	QuotePath string
+	// SuggestPath 搜索接口路径，默认 DefaultSuggestPath。
+	SuggestPath string
 	// Referer 来源页，默认 DefaultReferer。
 	//
 	// 建议传个股页或板块页地址（`https://finance.baidu.com/stock/ab-600009`），
@@ -129,6 +147,8 @@ func (c Config) withDefaults() Config {
 	}
 	c.BaseURL = strings.TrimRight(c.BaseURL, "/")
 	c.ConstituentsPath = normalizePath(c.ConstituentsPath, DefaultConstituentsPath)
+	c.QuotePath = normalizePath(c.QuotePath, DefaultQuotePath)
+	c.SuggestPath = normalizePath(c.SuggestPath, DefaultSuggestPath)
 	if strings.TrimSpace(c.Referer) == "" {
 		c.Referer = DefaultReferer
 	}
