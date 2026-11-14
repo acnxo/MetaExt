@@ -1,4 +1,4 @@
-# 区域字典（Region）
+# 区域字典（region）
 
 > 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/Region.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `region` 字段的取值字典——**区域原值为键，地区中文名为值**，\

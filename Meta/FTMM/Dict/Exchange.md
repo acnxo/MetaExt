@@ -1,4 +1,4 @@
-# 交易所字典（Exchange）
+# 交易所字典（exchange）
 
 > 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/Exchange.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `exchange` 字段的取值字典——**交易所代码为键，交易所中文名为值**，\

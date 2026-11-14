@@ -1,4 +1,4 @@
-# 市场分类字典（CsMarket）
+# 市场分类字典（cs_market）
 
 > 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/CsMarket.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `cs_market` 字段的取值字典——**市场分类原值为键，市场中文名为值**，\
