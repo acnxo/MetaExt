@@ -25,7 +25,9 @@ Meta/OpenAPI/
 └── Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
 
 Meta/FTMM/
-└── Dict/Region.md                          # 富途 region 字段取值字典
+└── Dict/
+    ├── MarketCode.md                       # 富途 market_code 字段取值字典
+    └── Region.md                           # 富途 region 字段取值字典
 ```
 
 ## 与 Docs 的分工
