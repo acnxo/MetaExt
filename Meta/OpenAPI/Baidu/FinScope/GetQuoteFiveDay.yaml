@@ -1,0 +1,270 @@
+openapi: 3.0.3
+
+info:
+  title: 百度股市通接口 getquotation（五日分时）
+  version: 1.0.0
+  description: |
+    记录 `GET /vapi/v1/getquotation` 在 `group=quotation_fiveday_ab` 下的 HTTP 规格：
+    取单只证券近五个交易日的分钟分时，按交易日分组返回。
+
+    与 K 线接口同路径、同参数集，差别是没有 `ktype` / `count`（周期固定为分钟，
+    窗口固定为五个交易日），且 `group` 不同。
+
+    返回的每日分钟点是字符串（`;` 分记录、`,` 分字段），列序由 `newMarketData.keys`
+    决定。实测为 7 列；不要沿用旧示例的 5 列硬编码，否则 `time` / `price` 会错位。
+    `time` 列是 `MM-DD HH:MM` 且**不带年份**，年份必须取同一元素上的 `date`。
+
+servers:
+  - url: https://finance.pae.baidu.com
+    description: 正式站点
+
+tags:
+  - name: QuoteFiveDay
+    description: 近五个交易日分钟分时
+
+paths:
+  /vapi/v1/getquotation:
+    get:
+      tags:
+        - QuoteFiveDay
+      operationId: getQuoteFiveDay
+      summary: 取近五个交易日的分钟分时
+      description: |
+        前 5 个参数为固定值，其后为业务参数；参数顺序不影响结果（接口不签名）。
+        本接口风控比 K 线接口更敏感，稳定采集需降低频率或更换出口网络。
+      parameters:
+        - name: srcid
+          in: query
+          required: true
+          description: 来源标识，固定 `5353`。
+          schema:
+            type: string
+            enum: ["5353"]
+          example: "5353"
+        - name: pointType
+          in: query
+          required: true
+          description: 点位类型，固定 `string`。
+          schema:
+            type: string
+            enum: [string]
+          example: string
+        - name: group
+          in: query
+          required: true
+          description: 接口分组，本接口固定 `quotation_fiveday_ab`。
+          schema:
+            type: string
+            enum: [quotation_fiveday_ab]
+          example: quotation_fiveday_ab
+        - name: newFormat
+          in: query
+          required: true
+          description: 新返回格式，固定 `1`。
+          schema:
+            type: integer
+            enum: [1]
+          example: 1
+        - name: finClientType
+          in: query
+          required: true
+          description: 客户端类型，固定 `pc`。
+          schema:
+            type: string
+            enum: [pc]
+          example: pc
+        - name: code
+          in: query
+          required: true
+          description: 证券代码，格式随 `market_type` 变化：A 股 6 位、港股 5 位、美股字母。
+          schema:
+            type: string
+          example: "399001"
+        - name: query
+          in: query
+          required: true
+          description: 搜索词，取与 `code` 相同的值。
+          schema:
+            type: string
+          example: "399001"
+        - name: market_type
+          in: query
+          required: true
+          description: |
+            市场类型：`ab` A 股、`hk` 港股、`us` 美股。`group` 名称自带 A 股后缀，
+            切换市场时需同时确认 `group` 是否仍可用。
+          schema:
+            type: string
+            enum: [ab, hk, us]
+          example: ab
+        - name: name
+          in: query
+          required: false
+          description: 证券简称，可空；传了更贴近浏览器真实请求。
+          schema:
+            type: string
+          example: 深证成指
+        - name: is_kc
+          in: query
+          required: true
+          description: |
+            注册制板块标记，规则同 K 线接口（`688` / `689` / `30x` / `8xx` / `4xx` → `1`）；
+            港股 / 美股固定 `0`。
+          schema:
+            type: integer
+            enum: [0, 1]
+          example: 0
+      responses:
+        '200':
+          description: HTTP 200；业务成败看 `Result` 一层
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FiveDayResponse'
+              example:
+                QueryID: "15325184726536934777"
+                ResultCode: 0
+                ResultNum: 0
+                Result:
+                  StdStg: hundsun_fivedays
+                  code: "399001"
+                  key: "399001"
+                  update:
+                    timezone: 北京时间
+                    text: "2026-11-13 15:00:00"
+                    time: 1794553200
+                  newMarketData:
+                    headers: [时间戳, 时间, 价格, 涨跌额, 涨跌幅, 成交量, 成交额]
+                    keys: [timestamp, time, price, range, ratio, volume, amount]
+                    marketData:
+                      - date: "2026-11-09"
+                        p: "1794187860,11-09 09:31,11256.33,+80.55,+0.72,2784792751.00,41449256787.00;1794187920,11-09 09:32,11245.94,+70.16,+0.63,1252108048.00,18677359165.00"
+                    maxPoints: "1201"
+                    cx: ["11-09"]
+      x-todo:
+        - 港股 / 美股（`market_type=hk|us`）未实测
+        - 旧形态（二维数组、对象数组）与字符串形态的兼容边界未逐一验证
+
+components:
+  schemas:
+    FiveDayResponse:
+      type: object
+      required: [QueryID, ResultCode, Result]
+      properties:
+        QueryID:
+          type: string
+          description: 请求追踪 ID。
+        ResultCode:
+          type: integer
+          description: 网关层结果，`0` 表示正常处理，不代表业务成功。
+        ResultNum:
+          type: integer
+          description: 实测为 `0`。
+        Result:
+          oneOf:
+            - $ref: '#/components/schemas/FiveDayResult'
+            - $ref: '#/components/schemas/RiskControlResult'
+    RiskControlResult:
+      type: object
+      description: 风控响应；外层 `ResultCode` 仍为 `0`。
+      required: [code, isCaptchaEnabled, msg]
+      properties:
+        code:
+          type: integer
+          description: 业务层错误码，风控为 `403`。
+        isCaptchaEnabled:
+          type: boolean
+          description: 是否要求验证码。
+        msg:
+          type: string
+          description: 错误描述，风控为 `hit risk`。
+    FiveDayResult:
+      type: object
+      properties:
+        StdStg:
+          type: string
+          description: 上游模块标识（实测 `hundsun_fivedays`），排障用。
+        StdStl:
+          type: string
+          description: 上游模块标识（实测 `8`），排障用。
+        provider:
+          type: string
+          description: 上游提供方（实测 `BAIDU`）。
+        code:
+          type: string
+          description: 证券代码。
+        key:
+          type: string
+          description: 查询键，与 `code` 相同。
+        update:
+          type: object
+          description: 数据时间。
+          properties:
+            timezone:
+              type: string
+              description: 时区（实测 `北京时间`）。
+            text:
+              type: string
+              description: 人类可读时间。
+            time:
+              type: integer
+              description: 秒级时间戳。
+            time_diff:
+              type: integer
+              description: 时差，部分响应携带。
+        newMarketData:
+          $ref: '#/components/schemas/FiveDayData'
+    FiveDayData:
+      type: object
+      properties:
+        headers:
+          type: array
+          description: 中文列名，与 `keys` 一一对应。
+          items:
+            type: string
+        keys:
+          type: array
+          description: 字段名，**决定 `p` 每条的列顺序**。
+          items:
+            type: string
+        marketData:
+          type: array
+          description: 按交易日分组的数组。
+          items:
+            $ref: '#/components/schemas/FiveDayItem'
+        maxPoints:
+          type: string
+          description: 单日最大点数（实测 `"1201"`），排障用。
+        cx:
+          type: array
+          description: 横轴日期标签，如 `["11-09", "11-10", ...]`。
+          items:
+            type: string
+    FiveDayItem:
+      type: object
+      properties:
+        date:
+          type: string
+          description: 交易日，`YYYY-MM-DD`。
+        p:
+          oneOf:
+            - type: string
+            - type: array
+              items: {}
+          description: |
+            该交易日的全部分时点。实测为字符串（`;` 分记录、`,` 分字段），列序由
+            `keys` 给出；旧数据 / 示例中可能是数组。
+        preClose:
+          type: number
+          description: 兼容字段，同级带昨收时用于派生涨跌额 / 涨跌幅；实测未带。
+        code:
+          type: string
+          description: 部分形态会携带证券代码。
+        name:
+          type: string
+          description: 部分形态会携带证券简称。
+        dates:
+          type: array
+          description: 部分形态会携带日期列表，与内层下标对应。
+          items:
+            type: string

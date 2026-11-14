@@ -14,6 +14,12 @@
 
 ```
 Meta/OpenAPI/
+├── Baidu/FinScope/GetConstituents.yaml     # 成分股列表（含行情快照）
+├── Baidu/FinScope/GetQuoteKLine.yaml       # 分钟 / 日级 K 线
+├── Baidu/FinScope/GetQuoteFiveDay.yaml     # 近五个交易日分钟分时
+├── Baidu/FinScope/GetQuoteForexMinute.yaml # 外汇分钟行情（占位）
+├── Baidu/FinScope/GetQuoteFuturesMinute.yaml  # 期货分钟行情（占位）
+├── Baidu/FinScope/GetQuoteFuturesFiveDay.yaml # 期货五日分时（占位）
 ├── MooMoo/QuoteAPIV2/GetKLine.yaml         # 行情 K 线
 ├── MooMoo/QuoteAPIV2/GetStockList.yaml     # 板块股票列表
 ├── MooMoo/QuoteAPIV2/GetOptionQuote.yaml   # 期权批量报价
