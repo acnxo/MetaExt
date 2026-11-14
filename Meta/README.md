@@ -8,6 +8,7 @@
 | 路径 | 说明 |
 | --- | --- |
 | `OpenAPI/<厂商>/<接口组>/<接口名>.yaml` | 外部 HTTP 接口的 OpenAPI 3.0.3 规格，一个接口一个文件 |
+| `FTMM/Dict/<字典名>.md` | 富途 / moomoo 字段取值字典，一个字段一个文件 |
 
 当前已收录：
 
@@ -22,13 +23,16 @@ Meta/OpenAPI/
 ├── MooMoo/QuoteAPIV2/GetHistoryCashTrend.yaml  # 历史资金流水
 ├── MooMoo/QuoteAPIV2/GetQuoteMinute.yaml   # 分钟级分时行情
 └── Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
+
+Meta/FTMM/
+└── Dict/Region.md                          # 富途 region 字段取值字典
 ```
 
 ## 与 Docs 的分工
 
 | 目录 | 定位 | 内容 |
 | --- | --- | --- |
-| `Meta/` | 给机器读 | OpenAPI 规格，只有结构化的接口定义 |
+| `Meta/` | 给机器读 | OpenAPI 规格、字段取值字典；只放结构化的规格与稳定口径 |
 | `Docs/` | 给人读 | 与规格同名的说明、签名规则、目录索引、开发规范 |
 
 两侧目录层级与文件名保持一致，例如：
@@ -54,6 +58,13 @@ Docs/OpenAPI/MooMoo/QuoteAPIV2/GetKLine.md
 2. 在 `Docs/OpenAPI/` 对应目录写同名 `.md`，并更新该目录的 `README.md` 索引；
 3. 校验 YAML 可解析、`$ref` 指向的组件都存在；
 4. 与实现代码、说明文档一起提交，不要只提交其中一部分。
+
+## 新增一个字段字典
+
+1. 在 `Meta/<厂商>/Dict/` 下建 `<字段名>.md`，文件名用大驼峰；
+2. 顶部引用块写清所属、用途、数据来源与关联字典，正文给取值表；
+3. 取值来自上游时注明统计时点，「数量」一类统计值只作参考，不当成枚举约束；
+4. 厂商目录有多个字典时补 `README.md` 索引，并更新本文件的收录列表。
 
 ## 编写要求
 
