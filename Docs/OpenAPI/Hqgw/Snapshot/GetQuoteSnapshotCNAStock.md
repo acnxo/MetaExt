@@ -3,18 +3,18 @@
 一次请求拿到 A 股全市场行情快照（`action=20199` + 板块内部码 `994650`），返回
 「表头 + 竖线分隔记录」的行情表；默认 45 个字段，可扩展到 462 个。
 机器可读规格见
-[Meta/OpenAPI/Citics/XetApp/GetQuoteSnapshotCNAStock.yaml](../../../../Meta/OpenAPI/Citics/XetApp/GetQuoteSnapshotCNAStock.yaml)。
+[Meta/OpenAPI/Hqgw/Snapshot/GetQuoteSnapshotCNAStock.yaml](../../../../Meta/OpenAPI/Hqgw/Snapshot/GetQuoteSnapshotCNAStock.yaml)。
 
 ## 接口
 
 | 项 | 内容 |
 | --- | --- |
 | 方法 | `POST`（也接受 `GET` + query，参数相同） |
-| 站点 | `https://xetapp.citics.com` |
+| 站点 | 上游行情网关（地址由 `Config.GatewayURL` 指定） |
 | 路径 | `/reqxml` |
 | 站点动作 | `action=20199`（指数 / 板块 → 成分行情） |
 | operationId | `getQuoteSnapshotCNAStock` |
-| 代码入口 | `xetapp.Client.GetQuoteSnapshotCNAStock`（`component/quote/citics/xetapp` 包） |
+| 代码入口 | `snapshot.Client.GetQuoteSnapshotCNAStock`（`component/quote/hqgw/snapshot` 包） |
 | 鉴权 | 无（无需登录态、无需 cookie、无签名） |
 | 备注 | **一次请求即可拿全市场**，无需分页；返回第一行恒为该池自身，需剔除；`MaxCount` 必须显式传 |
 
@@ -33,7 +33,7 @@
 | `StartPos` | 否 | int | 分页起点，从 `1` 开始，是**成分序号**而非行号 | `1` |
 | `NeedCheck` | 否 | string | 字段白名单，竖线分隔的字段码（`1`–`462`），末尾同样带竖线 | `1\|2\|4\|92\|208\|` |
 
-常用 `StockCode`（包内已内置为别名，见 `xetapp.Pools`）：
+常用 `StockCode`（包内已内置为别名，见 `snapshot.Pools`）：
 
 | 内部代码 | 别名 | 标的 | 成分数（实测） |
 | --- | --- | --- | --- |
@@ -71,7 +71,7 @@ action=20199&ReqlinkType=0&StockCode=994650&MaxCount=60000&NeedCheck=1|2|4|10|11
 | 五档推荐 | 用 `93`–`102`（价格，元）+ `180`–`189`（数量，手），单段可靠 |
 | 列索引 | 顶层 `STOCKCODEINDEX` 等 `*INDEX` 是默认 20 列的索引，传自定义 `NeedCheck` 后不更新 |
 
-Go 客户端默认取 45 个字段（`xetapp.DefaultFields`），追加用 `SnapshotRequest.ExtraFields`，
+Go 客户端默认取 45 个字段（`snapshot.DefaultFields`），追加用 `SnapshotRequest.ExtraFields`，
 完全自定义用 `Fields`。
 
 ## 响应
@@ -215,8 +215,8 @@ Go 客户端会把带单位的原始值转成数值：`%` 去掉，`万`/`亿`/`
 ## 客户端用法
 
 ```go
-client := xetapp.New(xetapp.Config{})
-result, err := client.GetQuoteSnapshotCNAStock(ctx, xetapp.SnapshotRequest{
+client := snapshot.New(snapshot.Config{})
+result, err := client.GetQuoteSnapshotCNAStock(ctx, snapshot.SnapshotRequest{
     Pool: "hs300",              // 别名或内部代码，空取 all
     ExtraFields: []int{341, 372}, // 在默认 45 字段上追加：本月涨幅、5日净流入
 })

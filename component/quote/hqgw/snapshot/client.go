@@ -1,4 +1,4 @@
-// Package xetapp 封装中信证券 XetApp 行情网关（`https://xetapp.citics.com/reqxml`）。
+// Package snapshot 封装上游行情网关。
 //
 // 当前实现 A 股行情快照（`action=20199` + 板块内部码 `994650`）：一次请求拿到全市场
 // 五千余只证券的多字段快照，无需分页、无需登录态、无签名。
@@ -22,7 +22,7 @@
 //   - 行情类字段在原始响应里带单位（`亿`/`万`/`%`），本包统一还原成数值：
 //     百分数去掉 `%`，`万`/`亿`/`万亿` 换算成元，「--」转成零值或不在结果中出现；
 //   - 需要额外指标时用 ExtraFields 追加字段码，不必改代码。
-package xetapp
+package snapshot
 
 import (
 	"context"
@@ -112,7 +112,7 @@ func (c Config) withDefaults() Config {
 	return c
 }
 
-// Client 是 XetApp 网关客户端。
+// Client 是 行情网关客户端。
 //
 // Client 并发安全：创建后仅读取配置，内部不保存可变状态。
 type Client struct {
@@ -150,11 +150,11 @@ type APIError struct {
 func (e *APIError) Error() string {
 	switch {
 	case e.ErrorNo != 0:
-		return fmt.Sprintf("XetApp 调用失败：ERRORNO=%d %s", e.ErrorNo, e.Message)
+		return fmt.Sprintf("行情网关调用失败：ERRORNO=%d %s", e.ErrorNo, e.Message)
 	case e.Attempts > 0:
-		return fmt.Sprintf("XetApp 请求失败（%d 次尝试）：%s", e.Attempts, e.Message)
+		return fmt.Sprintf("行情网关请求失败（%d 次尝试）：%s", e.Attempts, e.Message)
 	default:
-		return "XetApp 请求失败：" + e.Message
+		return "行情网关请求失败：" + e.Message
 	}
 }
 
