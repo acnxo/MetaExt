@@ -26,6 +26,9 @@ Meta/OpenAPI/
 
 Meta/FTMM/
 └── Dict/
+    ├── CSMarket.md                         # 富途 cs_market 字段取值字典
+    ├── CurrencyCode.md                     # 富途 currency_code 字段取值字典
+    ├── Exchange.md                         # 富途 exchange 字段取值字典
     ├── MarketCode.md                       # 富途 market_code 字段取值字典
     └── Region.md                           # 富途 region 字段取值字典
 ```
