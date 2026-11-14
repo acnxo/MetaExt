@@ -10,6 +10,7 @@
 | [Region.md](Region.md) | `region` | 证券所属地区，25 个取值 | 现行 |
 | [MarketCode.md](MarketCode.md) | `market_code` | 内部市场代码，54 个取值 | 现行 |
 | [MarketLabel.md](MarketLabel.md) | `marketLabel` | 响应侧市场标签，14 个取值 | 现行 |
+| [MarketType.md](MarketType.md) | `market_type` / `marketType` | 请求侧市场编号，10 个取值 | 现行 |
 | [Exchange.md](Exchange.md) | `exchange` | 主要交易平台代码，31 个取值 | 现行 |
 | [ListedExchange.md](ListedExchange.md) | `listed_exchange` | 具体上市交易所，49 个取值 | 现行 |
 | [CsMarket.md](CsMarket.md) | `cs_market` | 市场分类代码，29 个取值 | 现行 |
