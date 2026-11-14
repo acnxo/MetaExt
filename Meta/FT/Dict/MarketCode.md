@@ -1,6 +1,6 @@
 # 市场代码字典（market_code）
 
-> 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/MarketCode.md`\
+> 所属：MetaExt 元数据字典 · 存放：`Meta/FT/Dict/MarketCode.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `market_code` 字段的取值字典——**市场代码原值为键，市场与品种中文名为值**，\
 > 供证券按交易市场与品种分类、筛选与展示时统一口径。
 

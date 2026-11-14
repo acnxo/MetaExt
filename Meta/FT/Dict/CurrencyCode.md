@@ -1,6 +1,6 @@
 # 货币代码字典（currency_code）
 
-> 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/CurrencyCode.md`\
+> 所属：MetaExt 元数据字典 · 存放：`Meta/FT/Dict/CurrencyCode.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `currency_code` 字段的取值字典——**货币代码原值为键，货币中文名为值**，\
 > 供证券按计价货币归类、筛选与展示时统一口径。
 

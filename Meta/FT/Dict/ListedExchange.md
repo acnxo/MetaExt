@@ -1,6 +1,6 @@
 # 上市交易所字典（listed_exchange）
 
-> 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/ListedExchange.md`\
+> 所属：MetaExt 元数据字典 · 存放：`Meta/FT/Dict/ListedExchange.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `listed_exchange` 字段的取值字典——**上市交易所代码为键，交易所中文名为值**。\
 
 ## 一、字典表

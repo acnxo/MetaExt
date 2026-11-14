@@ -1,6 +1,6 @@
 # 证券子类型字典 V2（sub_instrument_type_v2）
 
-> 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/SubInstrumentTypeV2.md`\
+> 所属：MetaExt 元数据字典 · 存放：`Meta/FT/Dict/SubInstrumentTypeV2.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `sub_instrument_type_v2` 字段的取值字典——**子类型代码为键，子类型中文名为值**。\
 
 ## 一、字典表

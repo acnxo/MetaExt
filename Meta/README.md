@@ -8,7 +8,7 @@
 | 路径 | 说明 |
 | --- | --- |
 | `OpenAPI/<厂商>/<接口组>/<接口名>.yaml` | 外部 HTTP 接口的 OpenAPI 3.0.3 规格，一个接口一个文件 |
-| `FTMM/Dict/<字典名>.md` | 富途 / moomoo 字段取值字典，一个字段一个文件 |
+| `FT/Dict/<字典名>.md` | 富途 / moomoo 字段取值字典，一个字段一个文件 |
 
 当前已收录：
 
@@ -24,7 +24,7 @@ Meta/OpenAPI/
 ├── MooMoo/QuoteAPIV2/GetQuoteMinute.yaml   # 分钟级分时行情
 └── Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
 
-Meta/FTMM/
+Meta/FT/
 └── Dict/
     ├── CsMarket.md                         # 富途 cs_market 字段取值字典
     ├── CurrencyCode.md                     # 富途 currency_code 字段取值字典
