@@ -1,5 +1,6 @@
 # 证券主类型字典（instrument_type）
 
+> **已过时**：上游已改用 `instrument_type_v2`，新数据请用 [InstrumentTypeV2.md](InstrumentTypeV2.md)。\
 > 所属：MetaExt 元数据字典 · 存放：`Meta/FTMM/Dict/InstrumentType.md`\
 > 用途：富途 / moomoo（FTMM）数据中 `instrument_type` 字段的取值字典——**类型代码为键，品种大类中文名为值**。\
 

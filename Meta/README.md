@@ -29,12 +29,12 @@ Meta/FTMM/
     ├── CsMarket.md                         # 富途 cs_market 字段取值字典
     ├── CurrencyCode.md                     # 富途 currency_code 字段取值字典
     ├── Exchange.md                         # 富途 exchange 字段取值字典
-    ├── InstrumentType.md                   # 富途 instrument_type 字段取值字典
+    ├── InstrumentType.md                   # 富途 instrument_type 字段取值字典（已过时，见 V2）
     ├── InstrumentTypeV2.md                 # 富途 instrument_type_v2 字段取值字典
     ├── ListedExchange.md                   # 富途 listed_exchange 字段取值字典
     ├── MarketCode.md                       # 富途 market_code 字段取值字典
     ├── Region.md                           # 富途 region 字段取值字典
-    ├── SubInstrumentType.md                # 富途 sub_instrument_type 字段取值字典
+    ├── SubInstrumentType.md                # 富途 sub_instrument_type 字段取值字典（已过时，见 V2）
     └── SubInstrumentTypeV2.md              # 富途 sub_instrument_type_v2 字段取值字典
 ```
 
