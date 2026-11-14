@@ -11,7 +11,8 @@ info:
     窗口固定为五个交易日），且 `group` 不同。
 
     返回的每日分钟点是字符串（`;` 分记录、`,` 分字段），列序由 `newMarketData.keys`
-    决定。实测为 7 列；不要沿用旧示例的 5 列硬编码，否则 `time` / `price` 会错位。
+    决定。2026-11 实测为 10 列（比早期 7 列多 `avgPrice`、`totalVolume`、`totalAmount`）；
+    不要按任何固定列数硬编码，否则 `time` / `price` 会错位。
     `time` 列是 `MM-DD HH:MM` 且**不带年份**，年份必须取同一元素上的 `date`。
 
 servers:
@@ -224,7 +225,10 @@ components:
             type: string
         keys:
           type: array
-          description: 字段名，**决定 `p` 每条的列顺序**。
+          description: |
+            字段名，**决定 `p` 每条的列顺序**。2026-11 实测 10 列：
+            `timestamp`、`time`、`price`、`avgPrice`、`range`、`ratio`、`volume`、
+            `amount`、`totalVolume`、`totalAmount`；早期响应为 7 列（无均价与累积列）。
           items:
             type: string
         marketData:
