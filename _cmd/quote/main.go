@@ -44,6 +44,7 @@ func main() {
 func run() error {
 	var (
 		code     = flag.String("code", "", "证券或指数代码，如 899050（北证50）、920045")
+		kind     = flag.String("kind", "kline", "接口类型：kline K 线、fiveday 股票五日、forex 外汇分钟、futures 期货分钟、futures5d 期货五日")
 		wd       = flag.String("wd", "", "按名称搜索并输出行情快照，如 北证50；与 -code 二选一")
 		itemType = flag.String("type", "", "搜索时按类型过滤：index / stock / etf / block / fund")
 		market   = flag.String("marketType", finscope.MarketA, "市场：ab A 股、hk 港股、us 美股")
@@ -70,25 +71,110 @@ func run() error {
 	if *wd != "" {
 		return runSuggest(ctx, client, *wd, *itemType)
 	}
-	result, err := client.GetQuoteKLine(ctx, finscope.GetQuoteKLineRequest{
-		Code:       *code,
-		MarketType: *market,
-		Name:       *name,
-		IsKC:       *isKC,
-		KType:      *ktype,
-		Count:      *count,
-	})
-	if err != nil {
-		return err
+	switch *kind {
+	case "kline":
+		result, err := client.GetQuoteKLine(ctx, finscope.GetQuoteKLineRequest{
+			Code:       *code,
+			MarketType: *market,
+			Name:       *name,
+			IsKC:       *isKC,
+			KType:      *ktype,
+			Count:      *count,
+		})
+		if err != nil {
+			return err
+		}
+		if len(result.Bars) == 0 {
+			fmt.Println("接口返回正常，但没有任何 K 线数据（可能停牌或代码不存在）")
+			return nil
+		}
+		if *asJSON {
+			return printJSON(result)
+		}
+		printTable(result)
+		return nil
+	case "fiveday":
+		result, err := client.GetQuoteFiveDay(ctx, finscope.GetQuoteFiveDayRequest{
+			Code:       *code,
+			MarketType: *market,
+			Name:       *name,
+			IsKC:       *isKC,
+		})
+		if err != nil {
+			return err
+		}
+		return printFiveDay(result, *asJSON)
+	case "forex":
+		result, err := client.GetQuoteForexMinute(ctx, finscope.GetQuoteForexMinuteRequest{Code: *code})
+		if err != nil {
+			return err
+		}
+		return printRaw(result)
+	case "futures":
+		result, err := client.GetQuoteFuturesMinute(ctx, finscope.GetQuoteFuturesMinuteRequest{
+			Code: *code, MarketType: *market,
+		})
+		if err != nil {
+			return err
+		}
+		return printRaw(result)
+	case "futures5d":
+		result, err := client.GetQuoteFuturesFiveDay(ctx, finscope.GetQuoteFuturesFiveDayRequest{
+			Code: *code, MarketType: *market,
+		})
+		if err != nil {
+			return err
+		}
+		return printRaw(result)
+	default:
+		return fmt.Errorf("未知的 -kind：%s，可选 kline / fiveday / forex / futures / futures5d", *kind)
 	}
-	if len(result.Bars) == 0 {
-		fmt.Println("接口返回正常，但没有任何 K 线数据（可能停牌或代码不存在）")
+}
+
+// printFiveDay 打印股票五日分时：按交易日分组，默认只显示每日首尾两点。
+func printFiveDay(result *finscope.FiveDayResult, asJSON bool) error {
+	if len(result.Days) == 0 {
+		fmt.Println("接口返回正常，但没有任何分时数据")
 		return nil
 	}
-	if *asJSON {
-		return printJSON(result)
+	if asJSON {
+		data, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return fmt.Errorf("序列化结果失败：%w", err)
+		}
+		fmt.Println(string(data))
+		return nil
 	}
-	printTable(result)
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "交易日\t时间\t价格\t涨跌额\t涨跌幅\t成交量")
+	for _, day := range result.Days {
+		if len(day.Points) == 0 {
+			continue
+		}
+		for _, point := range day.Points {
+			fmt.Fprintf(w, "%s\t%s\t%.2f\t%+.2f\t%+.2f%%\t%.0f\n",
+				day.Date, point.Time, point.Price, point.ChangePrice, point.ChangeRatio, point.Volume)
+		}
+	}
+	_ = w.Flush()
+	fmt.Printf("\n共 %d 个交易日（跳过残缺记录 %d 条）\n", len(result.Days), result.Skipped)
+	return nil
+}
+
+// printRaw 输出结构尚未验证的接口的原始结果。
+func printRaw(result *finscope.RawQuoteResult) error {
+	fmt.Printf("QueryID: %s  ResultCode: %d\n", result.QueryID, result.ResultCode)
+	fmt.Println("响应结构尚未验证，以下为原始 Result：")
+	var pretty any
+	if err := json.Unmarshal(result.Result, &pretty); err != nil {
+		fmt.Println(string(result.Result))
+		return nil
+	}
+	data, err := json.MarshalIndent(pretty, "", "  ")
+	if err != nil {
+		return fmt.Errorf("格式化结果失败：%w", err)
+	}
+	fmt.Println(string(data))
 	return nil
 }
 

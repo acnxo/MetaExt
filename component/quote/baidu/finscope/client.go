@@ -39,6 +39,8 @@ const (
 	DefaultQuotePath = "/vapi/v1/getquotation"
 	// DefaultSuggestPath 搜索接口路径，用于按名称查代码。
 	DefaultSuggestPath = "/vapi/v1/sug"
+	// DefaultFuturesFiveDayPath 期货五日分时接口路径，与股票侧不同。
+	DefaultFuturesFiveDayPath = "/selfselect/getstockquotation"
 	// DefaultReferer 默认来源页；百度按来源页判断请求是否来自浏览器。
 	DefaultReferer = "https://gushitong.baidu.com/"
 	// DefaultUserAgent 浏览器 UA；建议与真实浏览器一致，空 UA 或工具 UA 更易被风控。
@@ -126,6 +128,8 @@ type Config struct {
 	QuotePath string
 	// SuggestPath 搜索接口路径，默认 DefaultSuggestPath。
 	SuggestPath string
+	// FuturesFiveDayPath 期货五日分时接口路径，默认 DefaultFuturesFiveDayPath。
+	FuturesFiveDayPath string
 	// Referer 来源页，默认 DefaultReferer。
 	//
 	// 建议传个股页或板块页地址（`https://finance.baidu.com/stock/ab-600009`），
@@ -149,6 +153,7 @@ func (c Config) withDefaults() Config {
 	c.ConstituentsPath = normalizePath(c.ConstituentsPath, DefaultConstituentsPath)
 	c.QuotePath = normalizePath(c.QuotePath, DefaultQuotePath)
 	c.SuggestPath = normalizePath(c.SuggestPath, DefaultSuggestPath)
+	c.FuturesFiveDayPath = normalizePath(c.FuturesFiveDayPath, DefaultFuturesFiveDayPath)
 	if strings.TrimSpace(c.Referer) == "" {
 		c.Referer = DefaultReferer
 	}

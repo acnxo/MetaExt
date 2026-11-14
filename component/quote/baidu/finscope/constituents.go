@@ -14,6 +14,8 @@ const (
 	FinanceTypeIndex = "index"
 	// FinanceTypeBlock 概念 / 行业板块成分股。
 	FinanceTypeBlock = "block"
+	// FinanceTypeFutures 期货，用于 getquotation 的 financeType 参数。
+	FinanceTypeFutures = "futures"
 )
 
 // 市场编码（参数 market）。
