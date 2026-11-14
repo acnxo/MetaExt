@@ -22,14 +22,14 @@ servers:
     description: 正式站点
 
 tags:
-  - name: Hqgw
+  - name: XetApp
     description: 行情网关
 
 paths:
   /reqxml:
     post:
       tags:
-        - Hqgw
+        - XetApp
       operationId: getQuoteSnapshotCNAStock
       summary: 拉取 A 股行情快照
       description: |

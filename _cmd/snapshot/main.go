@@ -23,13 +23,13 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/acnxo/MetaExt/component/quote/hqgw/snapshot"
+	"github.com/acnxo/MetaExt/component/quote/citics/xetapp"
 )
 
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "错误："+err.Error())
-		if snapshot.IsBusinessError(err) {
+		if xetapp.IsBusinessError(err) {
 			fmt.Fprintln(os.Stderr, "提示：这是服务端的业务错误码（ERRORNO 为负），检查池代码或改用支持的标的。")
 		}
 		os.Exit(1)
@@ -42,7 +42,7 @@ func run() error {
 		fields  = flag.String("fields", "", "自定义字段码，逗号分隔，如 1,2,4,92；为空用默认 45 字段")
 		extra   = flag.String("extra", "", "在默认字段上追加的字段码，逗号分隔，如 341,372")
 		limit   = flag.Int("limit", 20, "最多输出条数，0 表示全部")
-		maxRows = flag.Int("maxCount", snapshot.DefaultMaxCount, "请求的返回行数上限")
+		maxRows = flag.Int("maxCount", xetapp.DefaultMaxCount, "请求的返回行数上限")
 		asJSON  = flag.Bool("json", false, "以 JSON 输出完整字段")
 		timeout = flag.Duration("timeout", 120*time.Second, "整体超时时间")
 	)
@@ -62,9 +62,9 @@ func run() error {
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 
-	client := snapshot.New(snapshot.Config{})
+	client := xetapp.New(xetapp.Config{})
 	started := time.Now()
-	result, err := client.GetQuoteSnapshotCNAStock(ctx, snapshot.SnapshotRequest{
+	result, err := client.GetQuoteSnapshotCNAStock(ctx, xetapp.SnapshotRequest{
 		Pool:        *pool,
 		Fields:      fieldCodes,
 		ExtraFields: extraCodes,
@@ -110,16 +110,16 @@ func parseCodes(text string) ([]int, error) {
 }
 
 // printJSON 输出元信息与结构化行。
-func printJSON(result *snapshot.SnapshotResult, rows []snapshot.Row) error {
+func printJSON(result *xetapp.SnapshotResult, rows []xetapp.Row) error {
 	payload := struct {
-		Pool      string         `json:"pool"`
-		PoolName  string         `json:"pool_name"`
-		Total     int            `json:"total"`
-		Returned  int            `json:"returned"`
-		HQDate    string         `json:"hq_date"`
-		ServerAt  string         `json:"server_datetime"`
-		NeedCheck []int          `json:"need_check"`
-		Rows      []snapshot.Row `json:"rows"`
+		Pool      string       `json:"pool"`
+		PoolName  string       `json:"pool_name"`
+		Total     int          `json:"total"`
+		Returned  int          `json:"returned"`
+		HQDate    string       `json:"hq_date"`
+		ServerAt  string       `json:"server_datetime"`
+		NeedCheck []int        `json:"need_check"`
+		Rows      []xetapp.Row `json:"rows"`
 	}{
 		Pool:      result.PoolCode,
 		PoolName:  result.PoolName,
@@ -139,7 +139,7 @@ func printJSON(result *snapshot.SnapshotResult, rows []snapshot.Row) error {
 }
 
 // printTable 输出常用列；字段缺失时显示为 0。
-func printTable(result *snapshot.SnapshotResult, rows []snapshot.Row, elapsed time.Duration) {
+func printTable(result *xetapp.SnapshotResult, rows []xetapp.Row, elapsed time.Duration) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "代码\t名称\t最新\t涨跌幅\t成交额(亿)\t总市值(亿)\t市盈率\t市净率")
 	for _, row := range rows {
