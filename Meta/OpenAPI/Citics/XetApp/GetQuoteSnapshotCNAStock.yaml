@@ -1,0 +1,150 @@
+openapi: 3.0.3
+
+info:
+  title: 行情网关接口 reqxml（A 股行情快照）
+  version: 1.0.0
+  description: |
+    记录 `POST /reqxml` 在 `action=20199` 下的 HTTP 规格：按板块内部码拉取成分股行情快照，
+    一次请求即可拿到全市场，无需分页。
+
+    响应不是 JSON 数组，而是「表头 + 竖线分隔记录」的字符串表：`GRID0[0]` 是表头，
+    `GRID0[1]` 恒为池自身（需剔除），其后为成分。列顺序以回显的 `NEEDCHECK` 为准，
+    不按传参顺序；顶层 `*INDEX` 是默认 20 列的索引，传自定义 `NeedCheck` 后不更新。
+
+    `ERRORNO` 正值是正常的（等于返回行数 + 2），**只有负值才是错误**，且 HTTP 状态恒为 200。
+    `MaxCount` 必须显式传，不传时站点只返回 2 行。
+
+    响应可能带自定义扩展字段（`STOCKCODEINDEX`、`MARKETSTATUS`、`VOLUMEINFO` 等），
+    未在 schema 中列出的一律忽略。
+
+servers:
+  - url: https://xetapp.citics.com
+    description: 正式站点
+
+tags:
+  - name: XetApp
+    description: 行情网关
+
+paths:
+  /reqxml:
+    post:
+      tags:
+        - XetApp
+      operationId: getQuoteSnapshotCNAStock
+      summary: 拉取 A 股行情快照
+      description: |
+        参数顺序无关；可选参数缺省时整键省略。站点不校验 cookie、referer 与签名。
+        全市场请求偶发返回 HTTP 200 但响应体被截断，调用方应做退避重试。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SnapshotRequest'
+            example: 'action=20199&ReqlinkType=0&StockCode=994650&MaxCount=60000&NeedCheck=1|2|4|92|208|'
+      responses:
+        '200':
+          description: HTTP 恒为 200；业务成败看响应体 `ERRORNO`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotResponse'
+              example:
+                GRID0:
+                  - 名称|最新|幅度|涨跌|昨收|开盘|最高|最低|均价|总手|总额|现手|换手|振幅|委比|委差|量比|内盘|外盘|代码|
+                  - 沪深京全A|1488.03|-2.08%|-31.58|1519.61|1522.37|1526.09|1484.97|1504.97|10.37亿手|1.67万亿|1216.23万手|1.41%|2.71%|-2.04%|-125.33万手|1.02|--|--|994650|
+                  - 1.幸福蓝海|17.99|20.01%|3.00|14.99|14.90|17.99|14.90|17.05|60.75万手|10.36亿|8手|16.30%|20.61%|100.00%|7211.80手|1.92|27.02万|33.73万|300528|
+                ACTION: "20199"
+                MAXCOUNT: "5579"
+                ERRORNO: "5581"
+                NEEDCHECK: 1|2|4|3|5|6|7|8|9|10|11|12|13|16|14|15|50|49|48|32|
+                STOCKCODE: "994650"
+                STOCKNAME: 沪深京全A
+                HQDATE: "20261113"
+
+components:
+  schemas:
+    SnapshotRequest:
+      type: object
+      required: [action, ReqlinkType, StockCode, MaxCount]
+      properties:
+        action:
+          type: integer
+          description: 站点动作号，本接口固定 `20199`（指数 / 板块 → 成分行情）。
+          enum: [20199]
+        ReqlinkType:
+          type: integer
+          description: 行情通道，固定 `0`；传 `2` 会走业务网关并报错。
+          enum: [0]
+        StockCode:
+          type: string
+          description: |
+            板块 / 指数的**内部代码**：`994650` 沪深京全A（全市场）、`994649` 沪深A股、
+            `000300` 沪深300、`993665` 军工板块。与证券代码不是一套，请求 `000300` 时
+            响应回显的内部码是 `1A0300`。
+          example: "994650"
+        MaxCount:
+          type: integer
+          description: |
+            返回行数上限，**必须显式传**：不传只返回池自身与第一条成分。
+            超过成分数时按实际返回。
+          example: 60000
+        StartPos:
+          type: integer
+          description: |
+            分页起点，从 `1` 开始（`1` 与 `0` 等价），是**成分序号**而非行号；
+            越界时只回池自身一行。缺省时整键省略。
+          minimum: 1
+          example: 1
+        NeedCheck:
+          type: string
+          description: |
+            字段白名单，竖线分隔的字段码（`1`–`462`），末尾同样带竖线。
+            列顺序以响应回显的 `NEEDCHECK` 为准，不按传参顺序；缺省时返回默认 20 列。
+          example: '1|2|4|92|208|'
+    SnapshotResponse:
+      type: object
+      properties:
+        GRID0:
+          type: array
+          description: |
+            行情表：`[0]` 为表头（末尾带空列），`[1]` 恒为池自身，其后为成分。
+            记录同样以竖线结尾。
+          items:
+            type: string
+        ACTION:
+          type: string
+          description: 动作号回显，固定 `"20199"`。
+        MAXCOUNT:
+          type: string
+          description: 成分总数，**不是**本次返回的行数。
+        ERRORNO:
+          type: string
+          description: |
+            非标准错误码：正值是正常的（实测等于返回行数 + 2），**只有负值才是错误**。
+            已知负值：`-206008` 未找到匹配的证券代码、`-206021` 无该标的的排名信息、
+            `-989905` 功能被服务端禁用。
+        ERRORMESSAGE:
+          type: string
+          description: 参数错误时的中文提示，仅错误时出现。
+        NEEDCHECK:
+          type: string
+          description: 服务端实际生效的字段码，**列顺序以它为准**。
+        STOCKCODE:
+          type: string
+          description: 池自身的内部代码，如请求 `000300` 时为 `1A0300`。
+        STOCKNAME:
+          type: string
+          description: 池名称，如「沪深京全A」。
+        HQDATE:
+          type: string
+          description: 行情日期，`yyyyMMdd`。
+        SERVERDATETIME:
+          type: string
+          description: 服务器时间。
+        MARKETSTATUS:
+          type: string
+          description: 逐只市场状态串，与行数等长，如 `6|6|...`。
+        VOLUMEINFO:
+          type: string
+          description: 行情源标识，如 `libmshqplus.so:12AC-C247|`。
