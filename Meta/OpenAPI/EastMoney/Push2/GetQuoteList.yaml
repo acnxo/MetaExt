@@ -1,0 +1,210 @@
+openapi: 3.0.3
+
+info:
+  title: 东方财富 push2 行情列表接口
+  version: 1.0.0
+  description: |
+    记录 `GET /api/qt/clist/get` 的 HTTP 规格：返回全市场（或指定板块）的当日快照，
+    可按总市值或上市日期排序翻页。
+
+    站点有多个同集群镜像子域（`82.` / `1.` / `7.` / 主域），主域偶发 502。
+    `data` 为 `null` 表示被限频，换镜像重试。
+
+    字段码会随站点调整而增删，本库在解析结果里保留 `Raw`（字段码 → 原始文本）。
+
+servers:
+  - url: https://push2.eastmoney.com
+    description: 主站（实现中另有 82. / 1. / 7. 镜像子域轮换）
+
+tags:
+  - name: Push2
+    description: 东方财富行情集群
+
+paths:
+  /api/qt/clist/get:
+    get:
+      tags:
+        - Push2
+      operationId: getQuoteList
+      summary: 拉取一页行情快照
+      description: |
+        参数顺序无关（该接口不签名）。必须带 `referer: https://quote.eastmoney.com/`。
+        连续翻页会被限频，建议翻页之间留间隔并限制并发。
+      parameters:
+        - name: pn
+          in: query
+          required: true
+          description: 页码，从 1 开始。
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pz
+          in: query
+          required: true
+          description: 每页条数。
+          schema:
+            type: integer
+            default: 100
+        - name: po
+          in: query
+          required: true
+          description: 排序方向，0 升序、1 降序。
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+        - name: fid
+          in: query
+          required: true
+          description: 排序字段，`f20` 总市值、`f26` 上市日期。
+          schema:
+            type: string
+            enum: [f20, f26]
+            default: f20
+        - name: fs
+          in: query
+          required: true
+          description: 市场过滤串，逗号分隔。
+          schema:
+            type: string
+            default: m:0+t:6,m:1+t:2
+        - name: fields
+          in: query
+          required: true
+          description: 需要的字段码，逗号分隔。
+          schema:
+            type: string
+        - name: np
+          in: query
+          required: true
+          description: 固定 1，原样透传。
+          schema:
+            type: integer
+            enum: [1]
+        - name: fltt
+          in: query
+          required: true
+          description: 固定 2，原样透传。
+          schema:
+            type: integer
+            enum: [2]
+        - name: invt
+          in: query
+          required: true
+          description: 固定 2，原样透传。
+          schema:
+            type: integer
+            enum: [2]
+      responses:
+        '200':
+          description: HTTP 200；业务可用性看 data 是否为 null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteListResponse'
+              example:
+                rc: 0
+                data:
+                  total: 3210
+                  diff:
+                    - f2: 11.76
+                      f5: 2189429
+                      f6: 2593456789
+                      f12: "000001"
+                      f13: 0
+                      f14: 平安银行
+                      f15: 12.10
+                      f16: 11.70
+                      f17: 11.76
+                      f20: 230987654321
+                      f21: 220000000000
+                      f26: "1991-04-03"
+                      f124: 1763006400
+
+components:
+  schemas:
+    QuoteListResponse:
+      type: object
+      properties:
+        rc:
+          type: integer
+          description: 返回码，0 表示成功。
+        data:
+          type: object
+          nullable: true
+          description: 业务数据；被限频时为 `null`（换镜像重试）。
+          properties:
+            total:
+              type: integer
+              description: 符合条件的总条数。
+            diff:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuoteListRow'
+    QuoteListRow:
+      type: object
+      additionalProperties: true
+      description: |
+        一行快照，键为字段码。本项目请求 `f2,f5,f6,f12,f13,f14,f15,f16,f17,f20,f21,f26,f124`；
+        站点可能返回更多键，调用方按需读取。
+      properties:
+        f2:
+          description: 最新价（元）。缺失为 `"-"`。
+          oneOf:
+            - type: number
+            - type: string
+        f5:
+          description: 成交量（**手**）。
+          oneOf:
+            - type: number
+            - type: string
+        f6:
+          description: 成交额（元）。
+          oneOf:
+            - type: number
+            - type: string
+        f12:
+          type: string
+          description: 证券代码，六位字符串。
+        f13:
+          description: 市场，0 深市、1 沪市。
+          oneOf:
+            - type: integer
+            - type: string
+        f14:
+          type: string
+          description: 证券简称，可能含 ST / 退 标记。
+        f15:
+          description: 最高（元）。
+          oneOf:
+            - type: number
+            - type: string
+        f16:
+          description: 最低（元）。
+          oneOf:
+            - type: number
+            - type: string
+        f17:
+          description: 今开（元）。
+          oneOf:
+            - type: number
+            - type: string
+        f20:
+          description: 总市值（**元**）。
+          oneOf:
+            - type: number
+            - type: string
+        f21:
+          description: 流通市值（**元**）。
+          oneOf:
+            - type: number
+            - type: string
+        f26:
+          type: string
+          description: 上市日期，`yyyy-MM-dd`；缺失为空串或 `"-"`。
+        f124:
+          description: 行情时间戳（秒）。
+          oneOf:
+            - type: integer
+            - type: string

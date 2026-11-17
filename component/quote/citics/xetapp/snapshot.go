@@ -142,6 +142,30 @@ type Row struct {
 	// ChangePctWeek 本周涨幅（%），实测与 5 日同值。码 342。
 	ChangePctWeek float64
 
+	// 基金 / ETF 专属字段：不在默认 45 个字段内，需用 ExtraFields 追加对应码才会返回，
+	// 否则为零值（是否返回可用 Values 区分，未返回时 key 不存在）。
+
+	// Date 净值日期，形如 20261113。码 23。
+	Date string
+	// UnitNetValue 单位净值（元，T-1）。码 19。
+	UnitNetValue float64
+	// AccNetValue 累计净值（元）。码 20。
+	AccNetValue float64
+	// FundNav 基金净值（盘中实时参考净值，约等于 IOPV）。码 84。
+	FundNav float64
+	// FundScale 基金规模（元，净资产）。码 326。
+	FundScale float64
+	// DiscountRate 折价率（%），负值为折价。码 347。
+	DiscountRate float64
+	// ETFClass1 ETF 分类 1。码 364。
+	ETFClass1 string
+	// ETFClass2 ETF 分类 2。码 365。
+	ETFClass2 string
+	// TrackIndexCode 跟踪指数代码。码 387。
+	TrackIndexCode string
+	// TrackIndexName 跟踪指数名称。码 388。
+	TrackIndexName string
+
 	// Values 保存本次请求所有字段的解析结果，key 为英文字段名。
 	//
 	// 未命名的字段码用 f<code>；五档（码 93–102 与 180–189）汇总在 "depth"
@@ -153,9 +177,9 @@ type Row struct {
 type SnapshotResult struct {
 	// Rows 成分股快照，已剔除池自身那一行。
 	Rows []Row
-	// PoolCode 池的内部代码（响应回显或请求值）。
+	// PoolCode 池的内部代码（响应回显或请求值）；ETF 接口下是板块中文名。
 	PoolCode string
-	// PoolName 池名称，如「沪深京全A」。
+	// PoolName 池名称，如「沪深京全A」；ETF 与指数池接口不返回，为空。
 	PoolName string
 	// MaxCount 成分总数（不是返回行数）。
 	MaxCount int
@@ -184,6 +208,26 @@ type snapshotResponse struct {
 	MarketStatus   string   `json:"MARKETSTATUS"`
 }
 
+// boardFetch 描述一次「按板块取全量快照」的请求。
+//
+// A 股（20199）、ETF（20192）与指数的各个池（20191 / 20192 / 20198）共用同一套
+// 请求参数与解析逻辑，差别只在动作号与 StockCode 的含义。
+type boardFetch struct {
+	// Action 站点动作号。
+	Action string
+	// Board StockCode 的取值：20199 是池内部码，20192 是板块中文名，
+	// 20191 是市场号；20198 不需要该参数，留空即整键省略。
+	Board string
+	// Fields 调用方要的字段码，为空取 DefaultFields。
+	Fields []int
+	// Extra 在 Fields 基础上追加的字段码。
+	Extra []int
+	// MaxCount 返回行数上限，0 取 DefaultMaxCount。
+	MaxCount int
+	// StartPos 分页起点（成分序号），0 表示不传。
+	StartPos int
+}
+
 // GetQuoteSnapshotCNAStock 拉取 A 股行情快照。
 //
 // 一次请求返回整个池的成分快照，不需要分页。返回前会剔除「池自身」那一行
@@ -192,53 +236,72 @@ type snapshotResponse struct {
 // 响应结构异常、ERRORNO 为负值、无 GRID0 数据时返回 *APIError，
 // 网络错误与响应截断会自动重试。
 func (c *Client) GetQuoteSnapshotCNAStock(ctx context.Context, req SnapshotRequest) (*SnapshotResult, error) {
-	poolCode := resolvePool(req.Pool)
-	fields := wantedFields(req)
+	return c.fetchBoardSnapshot(ctx, boardFetch{
+		Action:   ActionQuoteSnapshot,
+		Board:    resolvePool(req.Pool),
+		Fields:   req.Fields,
+		Extra:    req.ExtraFields,
+		MaxCount: req.MaxCount,
+		StartPos: req.StartPos,
+	})
+}
 
-	// 内部固定多取「名称」与「代码」，用于识别并剔除池自身那一行；返回前再过滤掉。
-	fetch := append([]int(nil), fields...)
+// fetchBoardSnapshot 发起一次板块级快照请求并解析。
+func (c *Client) fetchBoardSnapshot(ctx context.Context, fetch boardFetch) (*SnapshotResult, error) {
+	fields := mergeFields(fetch.Fields, fetch.Extra)
+
+	// 内部固定多取「名称」与「代码」，用于识别并剔除池自身那一行、按代码去重；
+	// 返回前再过滤掉，保证输出不多不少。
+	needCheck := append([]int(nil), fields...)
 	for _, code := range []int{1, 32} {
-		if !containsInt(fetch, code) {
-			fetch = append(fetch, code)
+		if !containsInt(needCheck, code) {
+			needCheck = append(needCheck, code)
 		}
 	}
 
 	form := url.Values{}
-	form.Set("action", ActionQuoteSnapshot)
+	form.Set("action", fetch.Action)
 	form.Set("ReqlinkType", "0")
-	form.Set("StockCode", poolCode)
-	form.Set("MaxCount", strconv.Itoa(defaultInt(req.MaxCount, DefaultMaxCount)))
-	if req.StartPos > 0 {
-		form.Set("StartPos", strconv.Itoa(req.StartPos))
+	if board := strings.TrimSpace(fetch.Board); board != "" {
+		form.Set("StockCode", board)
 	}
-	form.Set("NeedCheck", formatNeedCheck(fetch))
+	form.Set("MaxCount", strconv.Itoa(defaultInt(fetch.MaxCount, DefaultMaxCount)))
+	if fetch.StartPos > 0 {
+		form.Set("StartPos", strconv.Itoa(fetch.StartPos))
+	}
+	form.Set("NeedCheck", formatNeedCheck(needCheck))
 
 	var payload snapshotResponse
 	if err := c.postJSON(ctx, form, &payload); err != nil {
 		return nil, err
 	}
-	result, err := decodeSnapshot(&payload, poolCode)
+	result, err := decodeSnapshot(&payload, strings.TrimSpace(fetch.Board))
 	if err != nil {
 		return nil, err
 	}
 	// 多取的内部字段只在调用方没要时才剔除。
-	if len(fetch) != len(fields) {
-		wanted := make(map[string]struct{}, len(fields))
-		for _, code := range fields {
-			wanted[fieldKey(code)] = struct{}{}
-			if fieldKind(code) == KindDepth {
-				wanted["depth"] = struct{}{}
-			}
+	if len(needCheck) != len(fields) {
+		filterValues(result.Rows, fields)
+	}
+	return result, nil
+}
+
+// filterValues 只保留调用方要的字段，去掉为识别池自身行而多取的字段。
+func filterValues(rows []Row, fields []int) {
+	wanted := make(map[string]struct{}, len(fields))
+	for _, code := range fields {
+		wanted[fieldKey(code)] = struct{}{}
+		if fieldKind(code) == KindDepth {
+			wanted["depth"] = struct{}{}
 		}
-		for i := range result.Rows {
-			for key := range result.Rows[i].Values {
-				if _, ok := wanted[key]; !ok {
-					delete(result.Rows[i].Values, key)
-				}
+	}
+	for i := range rows {
+		for key := range rows[i].Values {
+			if _, ok := wanted[key]; !ok {
+				delete(rows[i].Values, key)
 			}
 		}
 	}
-	return result, nil
 }
 
 // decodeSnapshot 校验 ERRORNO 与数据，并解析 GRID0。
@@ -393,6 +456,16 @@ func fillFields(row *Row, values map[string]any) {
 	row.ChangePct120D = asFloat(values["change_pct_120d"])
 	row.ChangePct250D = asFloat(values["change_pct_250d"])
 	row.ChangePctWeek = asFloat(values["change_pct_week"])
+	row.Date = asString(values["date"])
+	row.UnitNetValue = asFloat(values["unit_net_value"])
+	row.AccNetValue = asFloat(values["acc_net_value"])
+	row.FundNav = asFloat(values["fund_nav"])
+	row.FundScale = asFloat(values["fund_scale"])
+	row.DiscountRate = asFloat(values["discount_rate"])
+	row.ETFClass1 = asString(values["etf_class1"])
+	row.ETFClass2 = asString(values["etf_class2"])
+	row.TrackIndexCode = asString(values["track_index_code"])
+	row.TrackIndexName = asString(values["track_index_name"])
 }
 
 // convertValue 把原始字符串转成 Go 值；`--`、空串与 `-` 转成 nil。
@@ -447,19 +520,19 @@ func resolvePool(pool string) string {
 	return name
 }
 
-// wantedFields 合并 Fields 与 ExtraFields，去掉重复项。
-func wantedFields(req SnapshotRequest) []int {
-	fields := req.Fields
-	if len(fields) == 0 {
-		fields = DefaultFields
+// mergeFields 合并 Fields 与 ExtraFields，去掉重复项；Fields 为空取 DefaultFields。
+func mergeFields(fields, extra []int) []int {
+	base := fields
+	if len(base) == 0 {
+		base = DefaultFields
 	}
-	out := make([]int, 0, len(fields)+len(req.ExtraFields))
-	for _, code := range fields {
+	out := make([]int, 0, len(base)+len(extra))
+	for _, code := range base {
 		if !containsInt(out, code) {
 			out = append(out, code)
 		}
 	}
-	for _, code := range req.ExtraFields {
+	for _, code := range extra {
 		if !containsInt(out, code) {
 			out = append(out, code)
 		}

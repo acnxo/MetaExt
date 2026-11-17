@@ -1,0 +1,135 @@
+openapi: 3.0.3
+
+info:
+  title: 东方财富 push2his 日线接口
+  version: 1.0.0
+  description: |
+    记录 `GET /api/qt/stock/kline/get` 的 HTTP 规格：返回日线，含**真实的成交量（手）与
+    成交额（元）**。本项目有两处用法，共用同一个端点：
+
+    1. 交易日历：`secid=1.000001` 取上证指数最近 260 个交易日；
+    2. 个股日线备源：雪球不可用时改用它。
+
+    站点有三个镜像子域，长区间请求容易被限频，`data` 为 `null` 时换镜像重试。
+
+servers:
+  - url: https://push2his.eastmoney.com
+    description: 主站（实现中另有 1. / 82. 镜像子域轮换）
+
+tags:
+  - name: Push2
+    description: 东方财富行情集群
+
+paths:
+  /api/qt/stock/kline/get:
+    get:
+      tags:
+        - Push2
+      operationId: getKLine
+      summary: 拉取日线
+      description: |
+        参数顺序无关。`f56` 是「手」、`f57` 是「元」，本站点不返回复权因子。
+      parameters:
+        - name: secid
+          in: query
+          required: true
+          description: 证券标识，`1.` 开头为沪市、`0.` 开头为深市。
+          schema:
+            type: string
+            example: "1.000001"
+        - name: ut
+          in: query
+          required: false
+          description: 站点前端产物的公开固定参数，不是用户凭据。
+          schema:
+            type: string
+            default: fa5fd1943c7b386f172d6893dbfba10b
+        - name: fields1
+          in: query
+          required: true
+          description: 外层字段。
+          schema:
+            type: string
+            enum: ["f1,f2,f3,f4,f5,f6"]
+        - name: fields2
+          in: query
+          required: true
+          description: K 线字段，按顺序对应日期、开、收、高、低、量、额。
+          schema:
+            type: string
+            enum: ["f51,f52,f53,f54,f55,f56,f57"]
+        - name: klt
+          in: query
+          required: true
+          description: 周期，101 为日线。
+          schema:
+            type: integer
+            enum: [101]
+        - name: fqt
+          in: query
+          required: true
+          description: 复权方式，0 为不复权（本库只用该取值）。
+          schema:
+            type: integer
+            enum: [0]
+        - name: beg
+          in: query
+          required: false
+          description: 起始日期 `yyyyMMdd`。
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: 结束日期 `yyyyMMdd`。
+          schema:
+            type: string
+        - name: lmt
+          in: query
+          required: false
+          description: 返回条数上限；日历用 260，个股用 1000000。
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: HTTP 200；业务可用性看 data 是否为 null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KLineResponse'
+              example:
+                rc: 0
+                data:
+                  code: "000001"
+                  name: 平安银行
+                  klines:
+                    - "2004-12-31,6.580,6.590,6.660,6.580,17521,11568524.157"
+                    - "2026-11-13,11.760,12.070,12.100,11.700,2189429,2593456789.000"
+
+components:
+  schemas:
+    KLineResponse:
+      type: object
+      properties:
+        rc:
+          type: integer
+          description: 返回码，0 表示成功。
+        data:
+          type: object
+          nullable: true
+          description: 业务数据；被限频或代码不存在时为 `null`。
+          properties:
+            code:
+              type: string
+              description: 证券代码。
+            name:
+              type: string
+              description: 证券名称。
+            klines:
+              type: array
+              description: |
+                每根 K 线一个字符串，逗号分隔，位置固定：
+                `日期,开,收,高,低,量(手),额(元)`。空数组表示区间内无数据。
+              items:
+                type: string
+                example: "2026-11-13,11.760,12.070,12.100,11.700,2189429,2593456789.000"

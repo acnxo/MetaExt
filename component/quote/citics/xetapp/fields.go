@@ -31,7 +31,7 @@ type fieldSpec struct {
 	Label string
 }
 
-// fieldSpecs 是内嵌的字段规格表，覆盖 207 个已命名编码；
+// fieldSpecs 是内嵌的字段规格表，覆盖 208 个已命名编码；
 // 未列出的码按 f<code> + auto 处理，值为空时不出现在结果里。
 var fieldSpecs = map[int]fieldSpec{
 	1:   {Key: "name", Kind: KindStr, Label: "名称"},
@@ -55,7 +55,7 @@ var fieldSpecs = map[int]fieldSpec{
 	19:  {Key: "unit_net_value", Kind: KindPrice, Label: "单位净值"},
 	20:  {Key: "acc_net_value", Kind: KindPrice, Label: "累计净值"},
 	21:  {Key: "growth_value", Kind: KindPrice, Label: "增长值"},
-	22:  {Key: "nav_date", Kind: KindStr, Label: "增长率"},
+	22:  {Key: "growth_rate", Kind: KindPct, Label: "增长率"},
 	23:  {Key: "date", Kind: KindStr, Label: "日期"},
 	24:  {Key: "growth_date", Kind: KindStr, Label: "增长值日期"},
 	25:  {Key: "prev_unit_net_value", Kind: KindPrice, Label: "前日单位净值"},
@@ -196,6 +196,7 @@ var fieldSpecs = map[int]fieldSpec{
 	299: {Key: "change_pct_ytd", Kind: KindPct, Label: "今年涨幅"},
 	306: {Key: "pe_ttm", Kind: KindPrice, Label: "市盈率TTM"},
 	309: {Key: "trend_binary", Kind: KindBinary, Label: "走势"},
+	326: {Key: "fund_scale", Kind: KindAmount, Label: "基金规模"},
 	331: {Key: "main_net_inflow", Kind: KindAuto, Label: "主力净买入"},
 	333: {Key: "margin_ratio", Kind: KindPct, Label: "融资抵押率"},
 	335: {Key: "dividend_yield", Kind: KindPct, Label: "股息率"},

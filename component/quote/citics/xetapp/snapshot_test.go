@@ -331,7 +331,7 @@ func TestDefaultFieldsMatchSpec(t *testing.T) {
 	if len(DefaultFields) != 45 {
 		t.Errorf("默认字段数 = %d，期望 45", len(DefaultFields))
 	}
-	if len(fieldSpecs) != 207 {
-		t.Errorf("字段规格数 = %d，期望 207", len(fieldSpecs))
+	if len(fieldSpecs) != 208 {
+		t.Errorf("字段规格数 = %d，期望 208", len(fieldSpecs))
 	}
 }

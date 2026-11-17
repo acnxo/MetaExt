@@ -1,0 +1,114 @@
+openapi: 3.0.3
+
+info:
+  title: 深交所 ShowReport 证券列表接口
+  version: 1.0.0
+  description: |
+    记录 `GET /api/report/ShowReport/data` 的 HTTP 规格：按页返回深市证券的代码、简称与
+    **上市日期**。
+
+    每页只有 20 条、全量约 146 页，本库先取第 1 页拿 `metadata.pagecount`，
+    再并发翻完其余页并按页序拼接。
+
+    站点只支持 **HTTP**；简称字段带 `<u>` / `<a>` 高亮标签，需清理后才能入库。
+
+servers:
+  - url: http://www.szse.cn
+    description: 站点（仅 HTTP）
+
+tags:
+  - name: WebAPI
+    description: 深交所 Web API
+
+paths:
+  /api/report/ShowReport/data:
+    get:
+      tags:
+        - WebAPI
+      operationId: getStockList
+      summary: 拉取深市 A 股列表
+      description: |
+        `CATALOGID=1110` 为上市公司列表，`TABKEY=tab1` 为 A 股页签。
+      parameters:
+        - name: SHOWTYPE
+          in: query
+          required: true
+          description: 固定 JSON。
+          schema:
+            type: string
+            enum: [JSON]
+        - name: CATALOGID
+          in: query
+          required: true
+          description: 固定 1110。
+          schema:
+            type: string
+            enum: ["1110"]
+        - name: TABKEY
+          in: query
+          required: true
+          description: 固定 tab1。
+          schema:
+            type: string
+            enum: [tab1]
+        - name: PAGENO
+          in: query
+          required: true
+          description: 页码，从 1 开始。
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: HTTP 200；顶层是数组，本库取第 0 个元素
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PageTab'
+              example:
+                - metadata:
+                    pageno: "1"
+                    pagecount: "146"
+                    recordcount: "2912"
+                  data:
+                    - agdm: "000001"
+                      agjc: "<u>平安银行</u>"
+                      agssrq: "1991-04-03"
+
+components:
+  schemas:
+    PageTab:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            pageno:
+              type: string
+              description: 当前页码（字符串）。
+            pagecount:
+              type: string
+              description: 总页数（字符串）；缺失说明页签或参数不对。
+            recordcount:
+              type: string
+              description: 总记录数。
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockRow'
+    StockRow:
+      type: object
+      properties:
+        agdm:
+          type: string
+          description: A 股代码，六位字符串。
+        agjc:
+          type: string
+          description: |
+            A 股简称，带高亮标签。实测形态：`<u>平安银行</u>` 与
+            `<a href='...' target='_blank'>XD平安银行</a>`，本库会两步清理。
+        agssrq:
+          type: string
+          description: 上市日期 `yyyy-MM-dd`（与上交所的 yyyyMMdd 不同）。

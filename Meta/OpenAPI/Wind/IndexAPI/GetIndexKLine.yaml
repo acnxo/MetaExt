@@ -1,0 +1,125 @@
+openapi: 3.0.3
+
+info:
+  title: 万得官网指数日线接口
+  version: 1.0.0
+  description: |
+    记录 `GET /indexofficialwebsite/Kline` 的 HTTP 规格：按官网内部编码 `indexId` 返回
+    最近约 60 个交易日的开高低收、成交量、成交额与涨跌幅。
+
+    与 Wind 终端的 WindPy 不同，这是**公开网页 API**：不需要安装终端、不需要登录。
+
+    只返回最近约 60 个交易日，增量更新时必须与本地数据按日期合并去重。
+    最高价字段名拼写为 **`hight`**（不是 `high`）。
+    SSL 证书是 `*.wind.com.cn`，与 `index_api.wind.com.cn` 不匹配：本库关闭主机名校验，
+    但仍通过 VerifyConnection 做证书链校验。
+
+servers:
+  - url: https://index_api.wind.com.cn
+    description: 官网指数站点
+
+tags:
+  - name: IndexAPI
+    description: 万得官网指数接口
+
+paths:
+  /indexofficialwebsite/Kline:
+    get:
+      tags:
+        - IndexAPI
+      operationId: getIndexKLine
+      summary: 拉取指数日线
+      description: |
+        `indexId` 是官网内部编码（Base64 形态），无法从 windCode 推导，本库内置映射表。
+      parameters:
+        - name: indexId
+          in: query
+          required: true
+          description: |
+            官网内部编码，需 URL 编码（含 `+` `/` `=`）。
+            8841431.WI 对应 `2O5u8vTCa4KiLTLQ7DT/9w==`。
+          schema:
+            type: string
+        - name: lan
+          in: query
+          required: true
+          description: 语言，固定 cn。
+          schema:
+            type: string
+            enum: [cn]
+      responses:
+        '200':
+          description: HTTP 200；`Result` 为空表示无数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexKLineResponse'
+              example:
+                Result:
+                  - tradeDate: 1794499200000
+                    open: "6201.33"
+                    hight: "6230.11"
+                    low: "6170.55"
+                    close: "6188.07"
+                    volume: 12345678
+                    amount: 9876543210
+                    pctChange: "-0.21"
+
+components:
+  schemas:
+    IndexKLineResponse:
+      type: object
+      properties:
+        Result:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexKLineRow'
+        Message:
+          type: string
+          description: 失败时的提示。
+        Code:
+          type: integer
+          description: 失败时的错误码。
+    IndexKLineRow:
+      type: object
+      properties:
+        tradeDate:
+          type: integer
+          format: int64
+          description: 交易日，毫秒时间戳；本库按东八区换算日期。
+        open:
+          oneOf:
+            - type: string
+            - type: number
+          description: 开盘（点）。
+        hight:
+          oneOf:
+            - type: string
+            - type: number
+          description: 最高（点）。**字段名是 hight**，按 high 取会得到空值。
+        low:
+          oneOf:
+            - type: string
+            - type: number
+          description: 最低（点）。
+        close:
+          oneOf:
+            - type: string
+            - type: number
+          description: 收盘（点）；≤0 的行被丢弃。
+        volume:
+          oneOf:
+            - type: string
+            - type: number
+          description: 成交量（站点原始口径）。
+        amount:
+          oneOf:
+            - type: string
+            - type: number
+          description: 成交额（元）。
+        pctChange:
+          oneOf:
+            - type: string
+            - type: number
+            - type: "null"
+          description: 涨跌幅（%），可能为 null。

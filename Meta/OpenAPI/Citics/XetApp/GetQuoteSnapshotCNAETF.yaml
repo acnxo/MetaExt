@@ -1,0 +1,144 @@
+openapi: 3.0.3
+
+info:
+  title: 行情网关接口 reqxml（沪深 ETF 行情快照）
+  version: 1.0.0
+  description: |
+    记录 `POST /reqxml` 在 `action=20192` 下的 HTTP 规格：按**板块中文名**拉取成分行情快照，
+    全量 ETF 使用板块名 `沪深ETF基金`，一次请求即可拿到全部 1727 只，无需分页。
+
+    响应不是 JSON 数组，而是「表头 + 竖线分隔记录」的字符串表：`GRID0[0]` 是表头，
+    `GRID0[1]` 起即为 ETF 记录（**没有「池自身」这一行**）。列顺序以回显的 `NEEDCHECK`
+    为准，不按传参顺序；顶层 `*INDEX` 是默认 20 列的索引，传自定义 `NeedCheck` 后不更新。
+
+    `ERRORNO` 正值是正常的（等于返回行数 + 2），**只有负值才是错误**，且 HTTP 状态恒为 200。
+    `MaxCount` 必须显式传，不传时站点只返回 1 行。
+
+    该接口不返回 `STOCKCODE` / `STOCKNAME`；名称带 `1.` `2.` 递增序号前缀，需剥离。
+
+servers:
+  - url: https://xetapp.citics.com
+    description: 正式站点
+
+tags:
+  - name: XetApp
+    description: 行情网关
+
+paths:
+  /reqxml:
+    post:
+      tags:
+        - XetApp
+      operationId: getQuoteSnapshotCNAETF
+      summary: 拉取沪深 ETF 行情快照
+      description: |
+        参数顺序无关；可选参数缺省时整键省略。站点不校验 cookie、referer 与签名。
+        全量请求偶发返回 HTTP 200 但响应体被截断，调用方应做退避重试。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SnapshotRequest'
+            example: 'action=20192&ReqlinkType=0&StockCode=沪深ETF基金&MaxCount=60000&NeedCheck=1|2|4|92|208|'
+      responses:
+        '200':
+          description: HTTP 恒为 200；业务成败看响应体 `ERRORNO`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotResponse'
+              example:
+                GRID0:
+                  - 名称|最新|幅度|涨跌|昨收|开盘|最高|最低|均价|总手|总额|现手|换手|振幅|委比|委差|量比|内盘|外盘|代码|
+                  - 1.科创200ETF工银|1.194|4.01%|0.046|1.148|1.161|1.201|1.101|1.143|29925手|342.10万|1手|7.39%|8.71%|13.76%|2345.00手|0.61|1.33万|1.68万|589200|
+                  - 2.标普油气ETF富国|1.338|3.08%|0.040|1.296|1.300|1.344|1.290|1.318|18120手|238.10万|2手|5.12%|4.10%|6.20%|1120.00手|0.88|0.92万|1.14万|513350|
+                ACTION: "20192"
+                MAXCOUNT: "1727"
+                ERRORNO: "1729"
+                NEEDCHECK: 1|2|4|3|5|6|7|8|9|10|11|12|13|16|14|15|50|49|48|32|
+                HQDATE: "20261113"
+
+components:
+  schemas:
+    SnapshotRequest:
+      type: object
+      required: [action, ReqlinkType, StockCode, MaxCount]
+      properties:
+        action:
+          type: integer
+          description: 站点动作号，本接口固定 `20192`（板块中文名 → 成分行情）。
+          enum: [20192]
+        ReqlinkType:
+          type: integer
+          description: 行情通道，固定 `0`；传 `2` 会走业务网关并报错。
+          enum: [0]
+        StockCode:
+          type: string
+          description: |
+            **板块中文名**（不是内部代码）：全量沪深 ETF 用 `沪深ETF基金`。
+            实测 `沪市ETF基金` / `深市ETF基金` / `沪市ETF` / `深市ETF` 均返回
+            `-206021`（查无相应的排名信息）；`科创板` 等板块可用，但返回的是该板块
+            **股票**而不是 ETF，不要误用。中文需按 UTF-8 做表单编码。
+          example: 沪深ETF基金
+        MaxCount:
+          type: integer
+          description: |
+            返回行数上限，**必须显式传**：不传只返回 1 行。超过成分数时按实际返回。
+          example: 60000
+        StartPos:
+          type: integer
+          description: |
+            分页起点，从 `1` 开始，是**成分序号**而非行号；越界时只回表头 1 行。
+            缺省时整键省略。
+          minimum: 1
+          example: 1
+        NeedCheck:
+          type: string
+          description: |
+            字段白名单，竖线分隔的字段码（`1`–`462`），末尾同样带竖线。
+            列顺序以响应回显的 `NEEDCHECK` 为准，不按传参顺序；缺省时返回默认 20 列。
+          example: '1|2|4|92|208|'
+    SnapshotResponse:
+      type: object
+      properties:
+        GRID0:
+          type: array
+          description: |
+            行情表：`[0]` 为表头（末尾带空列），`[1]` 起即为 ETF 记录，**没有「池自身」行**。
+            记录同样以竖线结尾。
+          items:
+            type: string
+        ACTION:
+          type: string
+          description: 动作号回显，固定 `"20192"`。
+        MAXCOUNT:
+          type: string
+          description: 成分总数（= ETF 只数），**不是**本次返回的行数。
+        ERRORNO:
+          type: string
+          description: |
+            非标准错误码：正值是正常的（实测等于返回行数 + 2），**只有负值才是错误**。
+            已知负值：`-206008` 未找到匹配的证券代码、`-206021` 查无相应的排名信息、
+            `-989905` 功能被服务端禁用。
+        ERRORMESSAGE:
+          type: string
+          description: 参数错误时的中文提示，仅错误时出现。
+        NEEDCHECK:
+          type: string
+          description: 服务端实际生效的字段码，**列顺序以它为准**。
+        STOCKCODE:
+          type: string
+          description: 本接口不返回（`action=20199` 才有）。
+        STOCKNAME:
+          type: string
+          description: 本接口不返回（`action=20199` 才有）。
+        HQDATE:
+          type: string
+          description: 行情日期，`yyyyMMdd`。
+        SERVERDATETIME:
+          type: string
+          description: 服务器时间。
+        VOLUMEINFO:
+          type: string
+          description: 行情源标识。

@@ -21,6 +21,12 @@ Meta/OpenAPI/
 ├── Baidu/FinScope/GetQuoteFuturesMinute.yaml  # 期货分钟行情（占位）
 ├── Baidu/FinScope/GetQuoteFuturesFiveDay.yaml # 期货五日分时（占位）
 ├── Citics/XetApp/GetQuoteSnapshotCNAStock.yaml # A 股全市场行情快照
+├── Citics/XetApp/GetQuoteSnapshotCNAETF.yaml   # 沪深 ETF 行情快照
+├── Citics/XetApp/GetQuoteSnapshotCNAIndex.yaml # 沪深京全量指数（4 池合并）
+├── CNINFO/DataAPI/GetStockList.yaml        # 巨潮深市代码清单
+├── CSIndex/IndexAPI/GetIndexPerf.yaml      # 中证指数日行情
+├── EastMoney/Push2/GetQuoteList.yaml       # 东财全市场快照
+├── EastMoney/Push2/GetKLine.yaml           # 东财日线（含成交额）
 ├── MooMoo/QuoteAPIV2/GetKLine.yaml         # 行情 K 线
 ├── MooMoo/QuoteAPIV2/GetStockList.yaml     # 板块股票列表
 ├── MooMoo/QuoteAPIV2/GetOptionQuote.yaml   # 期权批量报价
@@ -29,7 +35,14 @@ Meta/OpenAPI/
 ├── MooMoo/QuoteAPIV2/GetFuturesList.yaml   # 期货合约列表
 ├── MooMoo/QuoteAPIV2/GetHistoryCashTrend.yaml  # 历史资金流水
 ├── MooMoo/QuoteAPIV2/GetQuoteMinute.yaml   # 分钟级分时行情
-└── Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
+├── Sina/Finance/CnaTradeCalendar/GetTradeCalendar.yaml  # A 股交易日历
+├── Sina/Finance/KLine/GetKLine.yaml        # 新浪长历史日线
+├── SSE/Query/GetStockList.yaml             # 上交所沪市 A 股列表
+├── SZSE/WebAPI/GetStockList.yaml           # 深交所深市 A 股列表
+├── Tencent/Gtimg/GetQuoteSnapshot.yaml     # 腾讯批量快照
+├── Tencent/Gtimg/GetKLine.yaml             # 腾讯日线
+├── Wind/IndexAPI/GetIndexKLine.yaml        # 万得官网指数日线
+└── XueQiu/Stock/GetKLine.yaml              # 雪球全历史日线
 
 Meta/FT/
 └── Dict/

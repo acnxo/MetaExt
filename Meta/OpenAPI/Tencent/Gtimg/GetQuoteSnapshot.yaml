@@ -1,0 +1,96 @@
+openapi: 3.0.3
+
+info:
+  title: 腾讯 gtimg 批量快照接口
+  version: 1.0.0
+  description: |
+    记录 `GET /q=<symbols>` 的 HTTP 规格：一次可带上百个代码，返回最新价、今开、
+    成交量、成交额、总市值与流通市值。
+
+    响应**不是 JSON**，而是 `v_sz000001="...";` 形式的 GBK 文本，按 `~` 拆分后
+    按下标取字段。单批超过约 900 只（URL 约 8.1 KB）会触发 HTTP 414，需要二分降级。
+
+    市值单位是**亿元**、成交额单位是**万元**、成交量单位是**手**，均需换算。
+
+servers:
+  - url: https://qt.gtimg.cn
+    description: 快照站点
+
+tags:
+  - name: Gtimg
+    description: 腾讯 gtimg 行情
+
+paths:
+  /q={symbols}:
+    get:
+      tags:
+        - Gtimg
+      operationId: getQuoteSnapshot
+      summary: 批量拉取行情快照
+      description: |
+        代码需带 `sh` / `sz` 前缀，逗号分隔。必须带 `referer: https://finance.qq.com/`。
+        响应为 GBK 文本，按 `;` 分行、按 `~` 分字段。
+      parameters:
+        - name: symbols
+          in: path
+          required: true
+          description: 带市场前缀的代码列表，逗号分隔。
+          schema:
+            type: string
+            example: sz000001,sh600000
+      responses:
+        '200':
+          description: HTTP 200；无行情的代码不会出现在响应中
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                v_sz000001="51~平安银行~000001~12.07~11.76~11.76~2189429~...~20261113150000~...~259345.67~...~2309.88~2309.88~...";
+        '414':
+          description: URL 过长（批量超过约 900 只）
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    QuoteSnapshotItem:
+      type: object
+      description: |
+        解析后的一条快照。下列下标来自按 `~` 拆分后的字段数组；本库只使用前 46 段。
+      properties:
+        Code:
+          type: string
+          description: 下标 2，证券代码。
+        Name:
+          type: string
+          description: 下标 1，证券简称（GBK 解码后）。
+        Last:
+          type: number
+          format: double
+          description: 下标 3，最新价（元）。
+        Open:
+          type: number
+          format: double
+          description: 下标 5，今开（元）。
+        Volume:
+          type: number
+          format: double
+          description: 下标 6，成交量（**手**）。
+        Amount:
+          type: number
+          format: double
+          description: 下标 37，成交额（万元 × 1e4 = 元）。
+        TotalMV:
+          type: number
+          format: double
+          description: 下标 45，总市值（亿元 × 1e8 = 元）。
+        FloatMV:
+          type: number
+          format: double
+          description: 下标 44，流通市值（亿元 × 1e8 = 元）。
+        Timestamp:
+          type: string
+          description: 下标 30，行情时间戳 `yyyyMMddHHmmss`。

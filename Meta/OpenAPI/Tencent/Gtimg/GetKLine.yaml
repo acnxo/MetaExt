@@ -1,0 +1,92 @@
+openapi: 3.0.3
+
+info:
+  title: 腾讯 gtimg 日线接口
+  version: 1.0.0
+  description: |
+    记录 `GET /appstock/app/fqkline/get` 的 HTTP 规格：返回日线，支持前复权。
+
+    请求前复权时站点返回 `qfqday`，否则返回 `day`；两者都缺失时表示无数据。
+    该接口**不返回成交额**，需要成交额时改用雪球或东财日线。
+
+servers:
+  - url: https://web.ifzq.gtimg.cn
+    description: 日线站点
+
+tags:
+  - name: Gtimg
+    description: 腾讯 gtimg 行情
+
+paths:
+  /appstock/app/fqkline/get:
+    get:
+      tags:
+        - Gtimg
+      operationId: getKLine
+      summary: 拉取日线
+      description: |
+        参数集中在 `param` 一个键里，由 6 段逗号拼接。
+      parameters:
+        - name: param
+          in: query
+          required: true
+          description: |
+            `<代码>,<周期>,<起>,<止>,<根数>,<复权>`，例如
+            `sz000001,day,2026-11-01,2026-11-30,1000,qfq`。
+            复权段为空表示不复权。
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTTP 200；业务可用性看 data 下的键是否存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KLineResponse'
+              example:
+                code: 0
+                msg: ""
+                data:
+                  sz000001:
+                    qfqday:
+                      - ["2026-11-13", "11.76", "12.07", "12.10", "11.70", "2189429"]
+                    day:
+                      - ["2026-11-13", "11.76", "12.07", "12.10", "11.70", "2189429"]
+
+components:
+  schemas:
+    KLineResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 0 表示成功。
+        msg:
+          type: string
+          description: 提示信息。
+        data:
+          type: object
+          description: 以请求的带前缀代码为键。
+          additionalProperties:
+            type: object
+            properties:
+              qfqday:
+                type: array
+                description: 前复权数据，请求 `qfq` 时出现。
+                items:
+                  $ref: '#/components/schemas/KLineRow'
+              day:
+                type: array
+                description: 不复权数据，未请求复权时出现。
+                items:
+                  $ref: '#/components/schemas/KLineRow'
+    KLineRow:
+      type: array
+      description: |
+        `[日期, 开, 收, 高, 低, 量]`；量单位是**手**，该接口不返回成交额。
+        行长度不足 6 段时本库直接跳过。
+      minItems: 6
+      items:
+        oneOf:
+          - type: string
+          - type: number

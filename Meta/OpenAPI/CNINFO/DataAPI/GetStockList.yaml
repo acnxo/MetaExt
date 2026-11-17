@@ -1,0 +1,73 @@
+openapi: 3.0.3
+
+info:
+  title: 巨潮资讯深市代码清单接口
+  version: 1.0.0
+  description: |
+    记录 `GET /new/data/szse_stock.json` 的 HTTP 规格：一次返回深市全部代码与简称，
+    无分页，是「代码清单」的首选来源。
+
+    该接口**不返回上市日期**，需要时由调用方另行补齐。
+    响应可能是 `{"stockList": [...]}`，也可能直接是数组，本库两种都兼容。
+
+servers:
+  - url: http://www.cninfo.com.cn
+    description: 站点（仅 HTTP）
+
+tags:
+  - name: DataAPI
+    description: 巨潮资讯数据接口
+
+paths:
+  /new/data/szse_stock.json:
+    get:
+      tags:
+        - DataAPI
+      operationId: getStockList
+      summary: 拉取深市代码清单
+      description: |
+        无查询参数，路径即全部输入；必须带 `referer: http://www.cninfo.com.cn/`。
+      responses:
+        '200':
+          description: HTTP 200；两种响应形态都要兼容
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockListResponse'
+              example:
+                stockList:
+                  - code: "000001"
+                    zwjc: 平安银行
+                    orgId: "9900001234"
+                    category: A股
+
+components:
+  schemas:
+    StockListResponse:
+      description: |
+        可能是 `{"stockList": [...]}`，也可能直接是数组。
+      oneOf:
+        - type: object
+          properties:
+            stockList:
+              type: array
+              items:
+                $ref: '#/components/schemas/StockRow'
+        - type: array
+          items:
+            $ref: '#/components/schemas/StockRow'
+    StockRow:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 六位代码；为空的行被丢弃。
+        zwjc:
+          type: string
+          description: 中文简称，可能含 ST / 退 标记。
+        orgId:
+          type: string
+          description: 机构 ID，本库不使用。
+        category:
+          type: string
+          description: 类别，本库不使用（改按代码前缀过滤）。

@@ -1,7 +1,15 @@
 // Package xetapp 封装上游行情网关。
 //
-// 当前实现 A 股行情快照（`action=20199` + 板块内部码 `994650`）：一次请求拿到全市场
-// 五千余只证券的多字段快照，无需分页、无需登录态、无签名。
+// 当前实现三个行情快照接口，字段码同一套、解析逻辑共用：
+//
+//   - GetQuoteSnapshotCNAStock：A 股全市场（`action=20199` + 板块内部码 `994650`），
+//     一次请求拿到五千余只证券；
+//   - GetQuoteSnapshotCNAETF：沪深全量 ETF（`action=20192` + 板块中文名 `沪深ETF基金`），
+//     一次请求拿到一千七百余只；
+//   - GetQuoteSnapshotCNAIndex：沪深京全量指数（`action=20191` / `20192` / `20198`
+//     四个池合并去重），站点没有「全部指数」单一入口，由本包串起 4 个请求。
+//
+// 三个接口都无需分页、无需登录态、无签名。
 //
 // 该网关的响应不是 JSON 数组，而是「表头 + 竖线分隔记录」的字符串表：
 //
@@ -43,8 +51,14 @@ const (
 	// DefaultUserAgent 默认 UA；站点不校验，带浏览器 UA 更稳妥。
 	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
 		"(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-	// ActionQuoteSnapshot 行情快照的动作号。
+	// ActionQuoteSnapshot 按池内部码取成分行情的动作号（A 股全市场）。
 	ActionQuoteSnapshot = "20199"
+	// ActionQuoteSnapshotETF 按板块中文名取成分行情的动作号（ETF 与部分指数池）。
+	ActionQuoteSnapshotETF = "20192"
+	// ActionQuoteSnapshotByMarket 按市场号取成分行情的动作号（中证指数池）。
+	ActionQuoteSnapshotByMarket = "20191"
+	// ActionQuoteSnapshotMarketIndex 大盘指数表的动作号，不需要 StockCode。
+	ActionQuoteSnapshotMarketIndex = "20198"
 	// DefaultPoolCode 沪深京全A 的板块内部代码（全市场，含北交所与 ST）。
 	DefaultPoolCode = "994650"
 	// DefaultMaxCount 返回行数上限；实测 5579~5580 只，留足余量。
