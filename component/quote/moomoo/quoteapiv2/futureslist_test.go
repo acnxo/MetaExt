@@ -2,6 +2,7 @@ package quoteapiv2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,16 +19,16 @@ const futuresListSample = `{
         "pagination": {"page": 0, "pageCount": 1, "pageSize": 40, "total": 14},
         "list": [
             {
-                "stockId": 70000294,
+                "stockId": "70000294",
                 "priceDirect": "down",
                 "fieldList": [
                     {"fieldId": 1, "fieldName": "合约代码", "text": "GCmain", "contentType": 4},
-                    {"fieldId": 3, "fieldName": "价格", "value": "4413800000000", "precision": 1, "contentType": 2},
+                    {"fieldId": 3, "fieldName": "价格", "value": "4413800000000", "precision": "1", "contentType": "2"},
                     {"fieldId": 4, "fieldName": "涨跌幅", "value": "-2508531", "precision": 2, "contentType": 1}
                 ],
                 "fields": {
                     "1": "GCmain", "2": "黄金", "3": "4413.8", "4": "-0.25%",
-                    "11": "315327.0", "18": "4424.9", "19": "US"
+                    "11": 315327.0, "18": 4424.9, "19": "US"
                 }
             }
         ]
@@ -94,6 +95,10 @@ func TestGetFuturesListRequestAndParse(t *testing.T) {
 	if item.Fields["1"] != "GCmain" || item.Fields["3"] != "4413.8" ||
 		item.Fields["4"] != "-0.25%" || item.Fields["19"] != "US" {
 		t.Fatalf("fields 展示值不符：%v", item.Fields)
+	}
+	// fields 的数值写法应统一转成文本。
+	if item.Fields["11"] != "315327.0" || item.Fields["18"] != "4424.9" {
+		t.Fatalf("fields 数值写法未转成文本：%v", item.Fields)
 	}
 	if len(item.FieldList) != 3 {
 		t.Fatalf("fieldList 项数期望 3，实际 %d", len(item.FieldList))
@@ -224,5 +229,51 @@ func TestGetFuturesListHTTPError(t *testing.T) {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.HTTPStatus != http.StatusServiceUnavailable {
 		t.Fatalf("应返回 HTTPStatus=503 的错误，实际 %v", err)
+	}
+}
+
+// TestFuturesListItemStockIDEncoding stockId 的字符串与数字两种编码都应能解析，
+// 缺失时归为 0，非法文本报错。
+func TestFuturesListItemStockIDEncoding(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want int64
+	}{
+		{"字符串", `{"stockId":"70000294"}`, 70000294},
+		{"数字", `{"stockId":70000294}`, 70000294},
+		{"首尾空白与千分位", `{"stockId":" 70,000,294 "}`, 70000294},
+		{"null", `{"stockId":null}`, 0},
+		{"空串", `{"stockId":""}`, 0},
+	}
+	for _, tc := range cases {
+		var item FuturesListItem
+		if err := json.Unmarshal([]byte(tc.body), &item); err != nil {
+			t.Fatalf("%s：解析失败: %v", tc.name, err)
+		}
+		if item.StockID != tc.want {
+			t.Fatalf("%s：stockId 期望 %d，实际 %d", tc.name, tc.want, item.StockID)
+		}
+	}
+
+	// 非数字文本与小数不能静默变成 0：该字段是落库主键。
+	for _, body := range []string{`{"stockId":"abc"}`, `{"stockId":"70000294.0"}`} {
+		var item FuturesListItem
+		if err := json.Unmarshal([]byte(body), &item); err == nil {
+			t.Fatalf("%s 应返回错误，实际解析为 %d", body, item.StockID)
+		}
+	}
+}
+
+// TestFuturesFieldFlexEncoding fieldId / precision / contentType 以字符串返回时也能解析。
+func TestFuturesFieldFlexEncoding(t *testing.T) {
+	var field FuturesField
+	body := `{"fieldId":"3","fieldName":"价格","value":"4413800000000","precision":"1","contentType":"2"}`
+	if err := json.Unmarshal([]byte(body), &field); err != nil {
+		t.Fatalf("解析失败: %v", err)
+	}
+	if field.FieldID != 3 || field.FieldName != "价格" || field.Value != "4413800000000" ||
+		field.Precision != 1 || field.ContentType != 2 {
+		t.Fatalf("字段定义不符：%+v", field)
 	}
 }

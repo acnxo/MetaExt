@@ -38,6 +38,8 @@ type FuturesListPage struct {
 // 字段定义与原始值。两者互补，一般直接取 Fields 即可；需要自己换算数值时才看 FieldList。
 type FuturesListItem struct {
 	// StockID 服务端内部证券唯一标识。
+	// 该字段线上以字符串返回（如 "70000294"），解码时兼容字符串与数字两种形式，
+	// 对外仍是 int64；缺失或空串为 0（表示无 ID）。
 	StockID int64 `json:"stockId"`
 	// PriceDirect 价格方向，如 up、down。
 	PriceDirect string `json:"priceDirect"`
@@ -45,7 +47,40 @@ type FuturesListItem struct {
 	FieldList []FuturesField `json:"fieldList"`
 	// Fields 字段展示值，键为字段编号的字符串形式（如 "3" 为价格）。
 	// 比 FieldList 多一个键 "19"（市场标签），该键在 FieldList 中没有对应项。
+	// 值可能以数字返回，解码时统一成文本。
 	Fields map[string]string `json:"fields"`
+}
+
+// UnmarshalJSON 兼容 stockId 与 fields 值的两种编码。
+//
+// 旧版本把 stockId 声明为 int64 且未做兼容，线上返回字符串时 json.Unmarshal 在第一个
+// 不匹配字段即失败，整页数据被丢弃。这里用 FlexInt64 / FlexNum 兜住两种形式，对外的
+// 字段类型（int64、map[string]string）保持不变，调用方无需改动。
+//
+// 匿名结构体中显式声明的字段深度为 0，内嵌的 plain 深度为 1；encoding/json 的字段选择
+// 规则是「浅者优先」，因此 stockId 与 fields 只由显式字段解析，其余字段仍走原结构体的
+// json tag，不需要复制一份完整结构。
+func (item *FuturesListItem) UnmarshalJSON(data []byte) error {
+	type plain FuturesListItem
+	aux := &struct {
+		StockID FlexInt64          `json:"stockId"`
+		Fields  map[string]FlexNum `json:"fields"`
+		*plain
+	}{plain: (*plain)(item)}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	item.StockID = aux.StockID.Int64()
+	if aux.Fields == nil {
+		item.Fields = nil
+		return nil
+	}
+	fields := make(map[string]string, len(aux.Fields))
+	for key, value := range aux.Fields {
+		fields[key] = value.String()
+	}
+	item.Fields = fields
+	return nil
 }
 
 // FuturesField 位置化字段中的一项。
@@ -62,6 +97,27 @@ type FuturesField struct {
 	Precision int `json:"precision"`
 	// ContentType 内容类型，决定数值的还原方式。
 	ContentType int `json:"contentType"`
+}
+
+// UnmarshalJSON 兼容整型字段的两种编码。
+//
+// fieldId / precision / contentType 在线上偶发以字符串返回（如 "3"），按 int 声明会让
+// 整条数据解码失败。这里统一用 FlexInt64 兜住，对外字段类型保持 int 不变。
+func (field *FuturesField) UnmarshalJSON(data []byte) error {
+	type plain FuturesField
+	aux := &struct {
+		FieldID     FlexInt64 `json:"fieldId"`
+		Precision   FlexInt64 `json:"precision"`
+		ContentType FlexInt64 `json:"contentType"`
+		*plain
+	}{plain: (*plain)(field)}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	field.FieldID = int(aux.FieldID)
+	field.Precision = int(aux.Precision)
+	field.ContentType = int(aux.ContentType)
+	return nil
 }
 
 // GetFuturesList 按市场与分类拉取期货合约列表（对应 get-futures-list 接口）。

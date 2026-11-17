@@ -8,6 +8,21 @@
 
 ## [Unreleased]
 
+`GetFuturesList` 兼容线上实际返回的字符串编码，修复该接口在真实响应下必然失败的问题。
+
+### Added
+
+- `FlexInt64`：兼容「数字」与「字符串数字」的整数类型，`null` / 空串解析为 0，
+  非数字文本与小数返回错误；`MarshalJSON` 仍输出数字
+
+### Fixed
+
+- `GetFuturesList` 的 `stockId` 兼容字符串编码（线上实际返回 `"70000294"`）。此前按
+  `int64` 声明且无自定义解码，`json.Unmarshal` 在首个不匹配字段即失败、整页数据丢失，
+  接口对任何调用方不可用；字段类型与调用方代码均不变（非破坏）
+- `GetFuturesList` 的 `fieldId` / `precision` / `contentType` 与 `fields` 的值同样兼容
+  字符串与数字两种编码，避免同一接口后续字段变换编码形态时再次整页解码失败
+
 ## [0.1.2] - 2026-11-08
 
 `quoteapiv2` 支持自定义请求头与中文站来源页，并新增两个外汇接口。

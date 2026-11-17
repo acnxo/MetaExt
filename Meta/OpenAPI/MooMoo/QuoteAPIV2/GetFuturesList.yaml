@@ -17,6 +17,10 @@ info:
     一般直接使用 `fields` 中的展示值；需要自己换算数值时才按内容类型还原 `value`。
     页码从 0 开始。
 
+    编码兼容：`stockId`、`fieldList` 的 `fieldId` / `precision` / `contentType` 与 `fields`
+    的值都可能以字符串或数字返回（`stockId` 线上实测为字符串），客户端两种形式都能解析，
+    调用方拿到的仍是稳定的类型。
+
 servers:
   - url: https://www.moomoo.com
     description: 正式站点
@@ -154,7 +158,7 @@ paths:
                         pageSize: 40
                         total: 14
                       list:
-                        - stockId: 70000294
+                        - stockId: "70000294"
                           priceDirect: down
                           fieldList:
                             - fieldId: 1
@@ -248,10 +252,14 @@ components:
         - stockId
       properties:
         stockId:
-          type: integer
-          format: int64
-          description: 服务端内部证券唯一标识。
-          example: 70000294
+          description: |
+            服务端内部证券唯一标识。线上实测以字符串返回（如 `"70000294"`），
+            也出现过数字形式；客户端两种都能解析，对外统一为 int64。
+          oneOf:
+            - type: integer
+              format: int64
+            - type: string
+          example: "70000294"
         priceDirect:
           type: string
           description: 价格方向，如 up、down。
@@ -286,8 +294,10 @@ components:
         `precision` 与 `contentType` 决定数值的还原方式。
       properties:
         fieldId:
-          type: integer
-          description: 字段位置，从 1 开始，各品种位置固定。
+          description: 字段位置，从 1 开始，各品种位置固定；字符串与数字两种编码都可能出现。
+          oneOf:
+            - type: integer
+            - type: string
           example: 3
         fieldName:
           type: string
@@ -304,10 +314,14 @@ components:
           description: 文本类字段的值，如合约代码、名称，仅文本类字段返回。
           example: GCmain
         precision:
-          type: integer
-          description: 小数位。价格类为放大偏移，数量类为展示小数位。
+          description: 小数位。价格类为放大偏移，数量类为展示小数位；字符串与数字两种编码都可能出现。
+          oneOf:
+            - type: integer
+            - type: string
           example: 1
         contentType:
-          type: integer
-          description: 内容类型，决定数值的还原方式。
+          description: 内容类型，决定数值的还原方式；字符串与数字两种编码都可能出现。
+          oneOf:
+            - type: integer
+            - type: string
           example: 2
