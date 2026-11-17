@@ -32,6 +32,12 @@ go get github.com/acnxo/MetaExt@v0.1.3
 go get github.com/acnxo/MetaExt@latest
 ```
 
+需要 **Go 1.25 或更高版本**（以 `go.mod` 的 `go` 指令为准）。
+
+本库依赖 `golang.org/x/text`（腾讯快照需 GBK 解码）。`go get` 之后请执行一次
+`go mod tidy`，把传递依赖补进下游的 `go.sum`；否则 `go build` 会报
+`missing go.sum entry`。
+
 ```go
 import (
     "github.com/acnxo/MetaExt/util"

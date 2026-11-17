@@ -40,7 +40,12 @@ jobs:
             go.sum
 
       - name: 校验依赖
-        run: go mod verify
+        run: |
+          go mod verify
+          # go.mod / go.sum 必须与源码一致：直接依赖不得标 // indirect，
+          # 依赖集合不得有冗余或缺失。有差异时 go mod tidy -diff 以非零退出。
+          go mod tidy -diff
+          echo "依赖校验通过"
 
       - name: 格式检查
         run: |
