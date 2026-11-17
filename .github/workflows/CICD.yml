@@ -34,8 +34,10 @@ jobs:
           # 版本以 go.mod 为准，避免 CI 与本地工具链不一致。
           go-version-file: go.mod
           cache: true
-          # 项目当前无第三方依赖，没有 go.sum；用 go.mod 作为缓存键，避免缓存步骤告警。
-          cache-dependency-path: go.mod
+          # 依赖只有 golang.org/x/text（腾讯快照需 GBK 解码），go.mod 与 go.sum 一起作缓存键。
+          cache-dependency-path: |
+            go.mod
+            go.sum
 
       - name: 校验依赖
         run: go mod verify

@@ -79,10 +79,15 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `stockId` | integer | 服务端内部证券唯一标识，`int64` |
+| `stockId` | int64 | 服务端内部证券唯一标识；线上以字符串 `"70000294"` 返回，偶见数字，两种都能解析；`null` 或空串为 `0`（表示无 ID） |
 | `priceDirect` | string | 价格方向，`up` / `down` |
 | `fieldList` | array | 字段定义数组，含原始值与类型 |
 | `fields` | object | 字段展示值，键为字段编号的字符串形式 |
+
+编码兼容：`stockId`、`fieldList` 的 `fieldId` / `precision` / `contentType` 以及 `fields`
+的值都可能以字符串或数字返回，本包两种形式都能解析：`stockId` 对外统一为 `int64`
+（`null` 与空串为 `0`，表示无 ID；非数字文本与小数会返回错误，不会静默变 0），
+`fields` 的值对外统一为文本。
 
 两者的关系：
 
@@ -98,12 +103,12 @@
 
 | 字段 | 字符串形式 | 数值形式 | 说明 |
 | --- | --- | --- | --- |
-| `fieldId` | 不出现 | `int`，如 `3` | 字段位置，从 1 开始 |
+| `fieldId` | `"3"` | `int`，如 `3` | 字段位置，从 1 开始；两种形式都可出现 |
 | `fieldName` | `"价格"` | 不出现 | 字段名，语种可能中英切换，不要按名称硬编码逻辑 |
 | `value` | `"4413800000000"` | 不出现 | 数值类字段的原始值（放大后的整数），仅数值类字段返回 |
 | `text` | `"GCmain"` | 不出现 | 文本类字段的值，仅文本类字段返回 |
-| `precision` | 不出现 | `int`，如 `1` | 小数位：价格类为放大偏移，数量类为展示小数位 |
-| `contentType` | 不出现 | `int`，如 `2` | 内容类型，决定数值还原方式 |
+| `precision` | `"1"` | `int`，如 `1` | 小数位：价格类为放大偏移，数量类为展示小数位；两种形式都可出现 |
+| `contentType` | `"2"` | `int`，如 `2` | 内容类型，决定数值还原方式；两种形式都可出现 |
 
 ### 字段位置对照
 
@@ -133,7 +138,7 @@
     "pagination": {"page": 0, "pageCount": 1, "pageSize": 40, "total": 14},
     "list": [
       {
-        "stockId": 70000294,
+        "stockId": "70000294",
         "priceDirect": "down",
         "fieldList": [
           {"fieldId": 1, "fieldName": "合约代码", "text": "GCmain", "contentType": 4},
@@ -175,7 +180,7 @@
 
 ## 相关实现
 
-- `futureslist.go`：必填校验、分页默认值、位置化字段解析
-- `client.go`：配置、错误类型与请求发送
+- `futureslist.go`：必填校验、分页默认值、位置化字段解析、字符串 / 数字编码兼容解码
+- `client.go`：配置、错误类型、`FlexInt64` / `FlexNum` 兼容解码类型与请求发送
 - `signature.go`：签名输入拼装与 `quote-token` 计算
-- `futureslist_test.go`：键序、默认参数向量、位置化字段解析与错误分类
+- `futureslist_test.go`：键序、默认参数向量、位置化字段解析、编码兼容与错误分类

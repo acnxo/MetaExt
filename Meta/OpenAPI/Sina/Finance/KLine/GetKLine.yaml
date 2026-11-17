@@ -1,0 +1,101 @@
+openapi: 3.0.3
+
+info:
+  title: 新浪财经日线接口
+  version: 1.0.0
+  description: |
+    记录 `GET /quotes_service/api/json_v2.php/CN_MarketData.getKLineData` 的 HTTP 规格：
+    返回长历史日线（一次最多数千根）。
+
+    该接口**没有成交额字段**，需要成交额时应改用雪球或东财日线；
+    `volume` 原生单位是**股**，与东财/腾讯的「手」不同。
+
+servers:
+  - url: https://money.finance.sina.com.cn
+    description: 财经站点
+
+tags:
+  - name: Finance
+    description: 新浪财经
+
+paths:
+  /quotes_service/api/json_v2.php/CN_MarketData.getKLineData:
+    get:
+      tags:
+        - Finance
+      operationId: getKLine
+      summary: 拉取日线
+      description: |
+        代码需带 `sh` / `sz` 前缀，指数与个股同一套规则。
+        必须带 `referer: https://finance.sina.com.cn/`。
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          description: 带市场前缀的代码。
+          schema:
+            type: string
+            example: sz399303
+        - name: scale
+          in: query
+          required: true
+          description: 周期（分钟数），240 为日线。
+          schema:
+            type: integer
+            enum: [240]
+            default: 240
+        - name: ma
+          in: query
+          required: true
+          description: 是否附带均线，固定 no。
+          schema:
+            type: string
+            enum: [no]
+        - name: datalen
+          in: query
+          required: true
+          description: 返回根数；4000 约 16 年。
+          schema:
+            type: integer
+            default: 4000
+      responses:
+        '200':
+          description: HTTP 200；限频时可能返回 `null` 或错误页
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KLineRow'
+              example:
+                - day: "2026-11-13"
+                  open: "11.760"
+                  high: "12.100"
+                  low: "11.700"
+                  close: "12.070"
+                  volume: "218942998"
+
+components:
+  schemas:
+    KLineRow:
+      type: object
+      description: 数值字段都以**字符串**返回，需显式转换；不含成交额。
+      properties:
+        day:
+          type: string
+          description: 交易日 `yyyy-MM-dd`。
+        open:
+          type: string
+          description: 开盘（元 / 点）。
+        high:
+          type: string
+          description: 最高。
+        low:
+          type: string
+          description: 最低。
+        close:
+          type: string
+          description: 收盘；`≤0` 的行本库会丢弃。
+        volume:
+          type: string
+          description: 成交量（**股**）。

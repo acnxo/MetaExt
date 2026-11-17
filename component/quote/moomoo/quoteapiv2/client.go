@@ -508,6 +508,51 @@ func (n FlexNum) Float() float64 {
 	return value
 }
 
+// FlexInt64 兼容「数字」与「字符串数字」两种 JSON 表示的整数。
+//
+// 与 FlexNum 的分工：FlexNum 底层是字符串，用于展示值；FlexInt64 承载的是证券 ID
+// 一类需要参与比较、排序与落库的字段，因此解析成 int64 而不是保留文本。结构体字段
+// 类型仍声明为 int64，配合自定义 UnmarshalJSON 使用，调用方无需改动。
+type FlexInt64 int64
+
+// Int64 返回 int64 形式。
+func (n FlexInt64) Int64() int64 { return int64(n) }
+
+// UnmarshalJSON 接受数字、字符串数字、null 与空串。
+//
+// 语义：null 与空串解析为 0，表示「无 ID」，调用方据此跳过该条；字符串先去首尾空白
+// 与千分位逗号再解析；非数字文本（如 "abc"）与小数（如 "70000294.0"）返回错误，
+// 该字段是落库主键，静默变成 0 不可见。
+func (n *FlexInt64) UnmarshalJSON(data []byte) error {
+	text := strings.TrimSpace(string(data))
+	if text == "" || text == "null" {
+		*n = 0
+		return nil
+	}
+	if text[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		text = strings.TrimSpace(s)
+	}
+	if text == "" {
+		*n = 0
+		return nil
+	}
+	value, err := strconv.ParseInt(strings.ReplaceAll(text, ",", ""), 10, 64)
+	if err != nil {
+		return fmt.Errorf("quoteapiv2: %q 无法解析为整数", text)
+	}
+	*n = FlexInt64(value)
+	return nil
+}
+
+// MarshalJSON 输出数字，保持与字段声明类型一致的编码形态。
+func (n FlexInt64) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.FormatInt(int64(n), 10)), nil
+}
+
 // truncate 截断过长的响应体，避免日志膨胀。
 func truncate(s string, limit int) string {
 	if len(s) <= limit {

@@ -1,0 +1,160 @@
+openapi: 3.0.3
+x-status: placeholder
+
+info:
+  title: 百度股市通接口 getstockquotation（期货五日分时）
+  version: 0.1.0
+  description: |
+    **占位规格**。记录 `GET /selfselect/getstockquotation` 在
+    `group=quotation_futures_fiveday` 下的请求侧事实：期货合约近五个交易日的分钟分时。
+
+    路径与股票侧不同（不是 `/vapi/v1/getquotation`），品种靠 5 个 `is*` 开关指定，
+    **必须且只能** `isFutures=true`，其余四个为 `false`；市场仍由 `market_type` 指定。
+
+    本机请求持续返回风控，`Result` 内部结构尚未取得样本，因此只收录已确认的请求参数，
+    不写响应字段表、不编造示例。它与股票五日是否同为
+    `newMarketData.headers` / `keys` / `marketData` 结构、是否包含夜盘时段，都需真实样本确认。
+
+servers:
+  - url: https://finance.pae.baidu.com
+    description: 正式站点
+
+tags:
+  - name: QuoteFuturesFiveDay
+    description: 期货近五个交易日分钟分时
+
+paths:
+  /selfselect/getstockquotation:
+    get:
+      tags:
+        - QuoteFuturesFiveDay
+      operationId: getQuoteFuturesFiveDay
+      summary: 取期货合约近五个交易日的分钟分时
+      description: |
+        参数顺序不影响结果（接口不签名）。与股票五日的差异还在于没有 `srcid`、
+        `pointType`、`query`、`name`、`is_kc`。
+      parameters:
+        - name: all
+          in: query
+          required: true
+          description: 返回全部字段，固定 `1`。
+          schema:
+            type: integer
+            enum: [1]
+          example: 1
+        - name: code
+          in: query
+          required: true
+          description: 期货合约代码，如 `AU888`（沪金主力连续）、`GC26Z`（COMEX 黄金 2026-12）。
+          schema:
+            type: string
+          example: AU888
+        - name: isIndex
+          in: query
+          required: true
+          description: 指数开关，期货固定 `false`。
+          schema:
+            type: boolean
+            enum: [false]
+          example: false
+        - name: isBk
+          in: query
+          required: true
+          description: 板块开关，期货固定 `false`。
+          schema:
+            type: boolean
+            enum: [false]
+          example: false
+        - name: isBlock
+          in: query
+          required: true
+          description: Block 开关，期货固定 `false`。
+          schema:
+            type: boolean
+            enum: [false]
+          example: false
+        - name: isFutures
+          in: query
+          required: true
+          description: 期货开关，固定 `true`。
+          schema:
+            type: boolean
+            enum: [true]
+          example: true
+        - name: isStock
+          in: query
+          required: true
+          description: 股票开关，期货固定 `false`。
+          schema:
+            type: boolean
+            enum: [false]
+          example: false
+        - name: newFormat
+          in: query
+          required: true
+          description: 新返回格式，固定 `1`。
+          schema:
+            type: integer
+            enum: [1]
+          example: 1
+        - name: market_type
+          in: query
+          required: true
+          description: 市场，`ab` 国内商品期货、`us` 美国市场期货。
+          schema:
+            type: string
+            enum: [ab, us]
+          example: ab
+        - name: group
+          in: query
+          required: true
+          description: 接口分组，固定 `quotation_futures_fiveday`。
+          schema:
+            type: string
+            enum: [quotation_futures_fiveday]
+          example: quotation_futures_fiveday
+        - name: finClientType
+          in: query
+          required: true
+          description: 客户端类型，固定 `pc`。
+          schema:
+            type: string
+            enum: [pc]
+          example: pc
+      responses:
+        '200':
+          description: HTTP 200；业务成败看 `Result` 一层，风控时 `QueryID` 可能为 `"0"`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                QueryID: "0"
+                ResultCode: 0
+                Result:
+                  code: 403
+                  isCaptchaEnabled: true
+                  msg: hit risk
+      x-todo:
+        - 正常响应的 `Result` 内部结构待取得真实样本
+        - 是否与股票五日的 `newMarketData.headers` / `keys` / `marketData` 结构一致待确认
+        - 是否包含夜盘时段待确认
+        - 合约非法 / 已交割时的业务码待实测
+        - 外盘期货（`market_type=us`）未实测
+
+components:
+  schemas:
+    Envelope:
+      type: object
+      description: 外层信封，三个百度接口共用；业务数据在 `Result` 一层。
+      required: [ResultCode, Result]
+      properties:
+        QueryID:
+          type: string
+          description: 请求追踪 ID；本接口风控时可能为 `"0"`。
+        ResultCode:
+          type: integer
+          description: 网关层结果，`0` 表示正常处理，不代表业务成功。
+        Result:
+          type: object
+          description: 业务数据；风控时为错误对象（`code` / `isCaptchaEnabled` / `msg`）。

@@ -145,6 +145,43 @@ func TestFlexNum(t *testing.T) {
 	}
 }
 
+// TestFlexInt64 JSON 数字、字符串、null 与空串都应能解析；非法文本报错。
+func TestFlexInt64(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want int64
+	}{
+		{"数字", `70000294`, 70000294},
+		{"字符串", `"70000294"`, 70000294},
+		{"首尾空白", `" 70000294 "`, 70000294},
+		{"千分位", `"70,000,294"`, 70000294},
+		{"null", `null`, 0},
+		{"空串", `""`, 0},
+	}
+	for _, tc := range cases {
+		var n FlexInt64
+		if err := json.Unmarshal([]byte(tc.in), &n); err != nil {
+			t.Fatalf("%s：解析失败: %v", tc.name, err)
+		}
+		if n.Int64() != tc.want {
+			t.Fatalf("%s：期望 %d，实际 %d", tc.name, tc.want, n.Int64())
+		}
+	}
+
+	for _, in := range []string{`"abc"`, `"70000294.0"`, `"1e5"`} {
+		var n FlexInt64
+		if err := json.Unmarshal([]byte(in), &n); err == nil {
+			t.Fatalf("%s 应返回错误，实际解析为 %d", in, n.Int64())
+		}
+	}
+
+	// MarshalJSON 输出数字，与原字段声明类型的编码形态一致。
+	if got, err := json.Marshal(FlexInt64(70000294)); err != nil || string(got) != "70000294" {
+		t.Fatalf("编码结果不符：%s / %v", got, err)
+	}
+}
+
 // TestTruncate 超长响应体应被截断，避免错误信息膨胀。
 func TestTruncate(t *testing.T) {
 	if got := truncate("abcdef", 3); got != "abc..." {

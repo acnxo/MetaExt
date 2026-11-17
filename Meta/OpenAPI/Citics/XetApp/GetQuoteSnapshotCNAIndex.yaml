@@ -1,0 +1,159 @@
+openapi: 3.0.3
+
+info:
+  title: 行情网关接口 reqxml（沪深京全量指数行情快照）
+  version: 1.0.0
+  description: |
+    记录「沪深京全量指数」的 HTTP 规格：站点没有「全部指数」的单一入口，需要串起
+    4 组 `POST /reqxml` 请求再按证券代码去重合并。
+
+    | 池 | action | StockCode | 成分数（实测） |
+    | --- | --- | --- | --- |
+    | 中证指数 | `20191` | `1100`（市场号） | 832 |
+    | 国证指数 | `20192` | `国证指数`（板块中文名） | 20 |
+    | 股转指数 | `20192` | `股转指数`（板块中文名） | 10 |
+    | 大盘指数 | `20198` | 不需要 | 42 |
+
+    四个池有重叠（实测 904 行去重后 879 只），**先出现的池优先**。响应不是 JSON 数组，
+    而是「表头 + 竖线分隔记录」的字符串表；`GRID0[0]` 是表头，`GRID0[1]` 起为指数
+    （**没有「池自身」行**，`20198` 除外也不返回 `STOCKCODE` / `STOCKNAME`）。
+
+    四组请求共用同一个 `NeedCheck`：不传时各池默认列数不同（`20191` 为 9 列，
+    `20192` / `20198` 为 20 列），传了之后表头统一，可共用解析逻辑。
+
+    `ERRORNO` 正值是正常的（等于返回行数 + 2），**只有负值才是错误**，HTTP 状态恒为 200。
+    `MaxCount` 必须显式传，不传时站点只返回 1 行。
+
+servers:
+  - url: https://xetapp.citics.com
+    description: 正式站点
+
+tags:
+  - name: XetApp
+    description: 行情网关
+
+paths:
+  /reqxml:
+    post:
+      tags:
+        - XetApp
+      operationId: getQuoteSnapshotCNAIndex
+      summary: 拉取沪深京全量指数行情快照
+      description: |
+        同一路径按 `action` 区分池，四组请求参数顺序无关，可选参数缺省时整键省略。
+        站点不校验 cookie、referer 与签名；全量请求偶发返回 HTTP 200 但响应体被截断，
+        调用方应做退避重试。任一池失败时不应把结果当作完整全量。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SnapshotRequest'
+            examples:
+              csi:
+                summary: 中证指数（20191 + 市场号 1100）
+                value: 'action=20191&ReqlinkType=0&StockCode=1100&MaxCount=60000&NeedCheck=1|2|4|92|208|'
+              cnindex:
+                summary: 国证指数（20192 + 板块中文名）
+                value: 'action=20192&ReqlinkType=0&StockCode=国证指数&MaxCount=60000&NeedCheck=1|2|4|92|208|'
+              neeq:
+                summary: 股转指数（20192 + 板块中文名）
+                value: 'action=20192&ReqlinkType=0&StockCode=股转指数&MaxCount=60000&NeedCheck=1|2|4|92|208|'
+              market:
+                summary: 大盘指数（20198，无 StockCode）
+                value: 'action=20198&ReqlinkType=0&MaxCount=60000&NeedCheck=1|2|4|92|208|'
+      responses:
+        '200':
+          description: HTTP 恒为 200；业务成败看响应体 `ERRORNO`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotResponse'
+              examples:
+                csi:
+                  summary: 中证指数池
+                  value:
+                    GRID0:
+                      - 名称|最新|幅度|涨跌|昨收|开盘|最高|最低|均价|总手|总额|现手|换手|振幅|委比|委差|量比|内盘|外盘|代码|
+                      - 1.180能源|2617.02|2.28%|58.33|2558.69|2560.11|2621.44|2556.32|--|597.46万手|89.23亿|--|0.20%|2.54%|--|--|1.02|--|--|H50001|
+                    ACTION: "20191"
+                    MAXCOUNT: "832"
+                    ERRORNO: "834"
+                    NEEDCHECK: 1|2|4|3|5|6|7|8|9|10|11|12|13|16|14|15|50|49|48|32|
+                    HQDATE: "20261113"
+
+components:
+  schemas:
+    SnapshotRequest:
+      type: object
+      required: [action, ReqlinkType, MaxCount]
+      properties:
+        action:
+          type: integer
+          description: |
+            站点动作号：`20191` 按市场号取成分，`20192` 按板块中文名取成分，
+            `20198` 大盘指数表（不需要 `StockCode`）。
+          enum: [20191, 20192, 20198]
+        ReqlinkType:
+          type: integer
+          description: 行情通道，固定 `0`；传 `2` 会走业务网关并报错。
+          enum: [0]
+        StockCode:
+          type: string
+          description: |
+            随 `action` 变化：`20191` 传**市场号**（中证指数为 `1100`），
+            `20192` 传**板块中文名**（`国证指数` / `股转指数`），`20198` 不使用该参数
+            （缺省时整键省略，不要传空串）。
+          example: "1100"
+        MaxCount:
+          type: integer
+          description: |
+            返回行数上限，**必须显式传**：不传只返回 1 行。超过成分数时按实际返回。
+          example: 60000
+        NeedCheck:
+          type: string
+          description: |
+            字段白名单，竖线分隔的字段码（`1`–`462`），末尾同样带竖线。四个池应传同一组码，
+            这样表头一致、可共用解析；缺省时各池默认列数不同。
+          example: '1|2|4|92|208|'
+    SnapshotResponse:
+      type: object
+      properties:
+        GRID0:
+          type: array
+          description: |
+            行情表：`[0]` 为表头（末尾带空列），`[1]` 起为指数记录，**没有「池自身」行**。
+            记录同样以竖线结尾，名称带 `1.` 序号前缀（各池独立编号，跨池会重复）。
+          items:
+            type: string
+        ACTION:
+          type: string
+          description: 动作号回显（`"20191"` / `"20192"` / `"20198"`）。
+        MAXCOUNT:
+          type: string
+          description: 该池的成分总数（832 / 20 / 10 / 42），**不是**本次返回的行数。
+        ERRORNO:
+          type: string
+          description: |
+            非标准错误码：正值是正常的（实测等于返回行数 + 2），**只有负值才是错误**。
+            已知负值：`-206008` 未找到匹配的证券代码、`-206021` 查无相应的排名信息、
+            `-989905` 功能被服务端禁用。
+        ERRORMESSAGE:
+          type: string
+          description: 参数错误时的中文提示，仅错误时出现。
+        NEEDCHECK:
+          type: string
+          description: 服务端实际生效的字段码，**列顺序以它为准**。
+        STOCKCODE:
+          type: string
+          description: |
+            `20198` 不返回；`20191` 即使返回也是市场号，不代表某只指数。
+        STOCKNAME:
+          type: string
+          description: 同上，不能用作池自身行的判定依据。
+        HQDATE:
+          type: string
+          description: 行情日期，`yyyyMMdd`。
+        SERVERDATETIME:
+          type: string
+          description: 服务器时间。

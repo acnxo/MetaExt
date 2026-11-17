@@ -1,0 +1,157 @@
+openapi: 3.0.3
+
+info:
+  title: 雪球日线接口
+  version: 1.0.0
+  description: |
+    记录 `GET /v5/stock/chart/kline.json` 的 HTTP 规格：一次返回全历史日线（最多 8000 根），
+    `volume` 原生是**股**、`amount` 原生是**元**，无需换算。
+
+    **需要 cookie**：先访问 `https://xueqiu.com/` 拿到会话，再带 cookie 请求数据接口。
+    cookie 失效时数据接口返回空 `item`。
+
+    响应用列式结构（`column` + `item`），必须按列名查下标，不能写死位置。
+
+servers:
+  - url: https://stock.xueqiu.com
+    description: 行情站点
+
+tags:
+  - name: Stock
+    description: 雪球证券行情
+
+paths:
+  /v5/stock/chart/kline.json:
+    get:
+      tags:
+        - Stock
+      operationId: getKLine
+      summary: 拉取日线
+      description: |
+        `count` 传负数表示向前取 N 根。必须带 `referer: https://xueqiu.com/` 与预热
+        得到的 cookie。
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          description: 带市场前缀的大写代码。
+          schema:
+            type: string
+            example: SZ000001
+        - name: begin
+          in: query
+          required: true
+          description: 毫秒时间戳，通常传当前时间。
+          schema:
+            type: integer
+            format: int64
+        - name: period
+          in: query
+          required: true
+          description: 周期，固定 day。
+          schema:
+            type: string
+            enum: [day]
+        - name: count
+          in: query
+          required: true
+          description: 根数，负数表示向前取。
+          schema:
+            type: integer
+            default: -8000
+        - name: indicator
+          in: query
+          required: true
+          description: 固定 kline。
+          schema:
+            type: string
+            enum: [kline]
+        - name: type
+          in: query
+          required: true
+          description: 固定 normal（不复权）。
+          schema:
+            type: string
+            enum: [normal]
+      responses:
+        '200':
+          description: HTTP 200；`item` 为空通常表示 cookie 失效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KLineResponse'
+              example:
+                error_code: 0
+                data:
+                  symbol: SZ000001
+                  period: day
+                  column: [timestamp, volume, open, high, low, close, amount]
+                  item:
+                    - [1794499200000, 218942998, 11.76, 12.10, 11.70, 12.07, 2593456789]
+
+components:
+  schemas:
+    KLineResponse:
+      type: object
+      properties:
+        error_code:
+          type: integer
+          description: 0 表示成功。
+        error_description:
+          type: string
+          description: 失败原因。
+        data:
+          type: object
+          properties:
+            symbol:
+              type: string
+              description: 代码回显。
+            period:
+              type: string
+              description: 周期回显。
+            column:
+              type: array
+              description: 列名数组，决定 item 每个下标的含义。
+              items:
+                type: string
+            item:
+              type: array
+              description: 二维数组，每行一根 K 线；下标按 column 查。
+              items:
+                type: array
+                items:
+                  oneOf:
+                    - type: number
+                    - type: string
+                    - type: "null"
+    KLineBar:
+      type: object
+      description: 解析后的一根日线；`Volume` 单位是股、`Amount` 单位是元，均不换算。
+      properties:
+        Date:
+          type: string
+          description: 由 timestamp（毫秒）按东八区换算的 `yyyy-MM-dd`。
+        Open:
+          type: number
+          format: double
+          description: 开盘。
+        Close:
+          type: number
+          format: double
+          description: 收盘。
+        High:
+          type: number
+          format: double
+          description: 最高。
+        Low:
+          type: number
+          format: double
+          description: 最低。
+        Volume:
+          type: number
+          format: double
+          description: 成交量（**股**）。
+        Amount:
+          type: number
+          format: double
+          description: 成交额（**元**）。

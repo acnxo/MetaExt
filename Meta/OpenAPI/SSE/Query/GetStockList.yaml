@@ -1,0 +1,134 @@
+openapi: 3.0.3
+
+info:
+  title: 上交所 sseQuery 证券列表接口
+  version: 1.0.0
+  description: |
+    记录 `GET /sseQuery/commonQuery.do` 的 HTTP 规格：一次返回沪市 A 股的代码、简称与
+    **上市日期**，无需翻页。
+
+    站点只支持 **HTTP**，且要求带 `referer: http://www.sse.com.cn/`。
+    `LIST_DATE` 为 `yyyyMMdd`，不是八位数字的行本库会直接丢弃。
+
+servers:
+  - url: http://query.sse.com.cn
+    description: 站点（仅 HTTP）
+
+tags:
+  - name: Query
+    description: 上交所查询接口
+
+paths:
+  /sseQuery/commonQuery.do:
+    get:
+      tags:
+        - Query
+      operationId: getStockList
+      summary: 拉取沪市 A 股列表
+      description: |
+        参数固定，`pageSize` 设 3000 即可覆盖全部沪市 A 股。
+      parameters:
+        - name: sqlId
+          in: query
+          required: true
+          description: 固定 COMMON_SSE_CP_GPJCTPZ_GPLB_GP_L。
+          schema:
+            type: string
+            enum: [COMMON_SSE_CP_GPJCTPZ_GPLB_GP_L]
+        - name: type
+          in: query
+          required: true
+          description: 固定 inParams。
+          schema:
+            type: string
+            enum: [inParams]
+        - name: STOCK_TYPE
+          in: query
+          required: true
+          description: 证券类型，1 为 A 股。
+          schema:
+            type: integer
+            enum: [1]
+        - name: COMPANY_STATUS
+          in: query
+          required: true
+          description: 公司状态过滤。
+          schema:
+            type: string
+            enum: ["2,4,5,7,8"]
+        - name: pageHelp.pageSize
+          in: query
+          required: true
+          description: 每页条数。
+          schema:
+            type: integer
+            default: 3000
+        - name: pageHelp.pageNo
+          in: query
+          required: true
+          description: 页码，本库只取第 1 页。
+          schema:
+            type: integer
+            enum: [1]
+        - name: pageHelp.beginPage
+          in: query
+          required: true
+          description: 固定 1。
+          schema:
+            type: integer
+            enum: [1]
+        - name: pageHelp.endPage
+          in: query
+          required: true
+          description: 固定 1。
+          schema:
+            type: integer
+            enum: [1]
+        - name: pageHelp.cacheSize
+          in: query
+          required: true
+          description: 固定 1。
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: HTTP 200；内容为 JSON（可能被标成 text/html）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockListResponse'
+              example:
+                pageHelp:
+                  pageNo: 1
+                  pageSize: 3000
+                  total: 2263
+                result:
+                  - A_STOCK_CODE: "600000"
+                    SEC_NAME_CN: 浦发银行
+                    LIST_DATE: "19991110"
+
+components:
+  schemas:
+    StockListResponse:
+      type: object
+      properties:
+        pageHelp:
+          type: object
+          description: 分页信息，本库不使用。
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockRow'
+    StockRow:
+      type: object
+      properties:
+        A_STOCK_CODE:
+          type: string
+          description: 六位代码（可能带空格，本库会 trim）。
+        SEC_NAME_CN:
+          type: string
+          description: 简称。
+        LIST_DATE:
+          type: string
+          description: 上市日期 `yyyyMMdd`；非八位数字的行被丢弃。

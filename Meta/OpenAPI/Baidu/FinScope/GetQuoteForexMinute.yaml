@@ -1,0 +1,104 @@
+openapi: 3.0.3
+x-status: placeholder
+
+info:
+  title: 百度股市通接口 getquotation（外汇分钟）
+  version: 0.1.0
+  description: |
+    **占位规格**。记录 `GET /vapi/v1/getquotation` 在 `group=huilv_minute` 下的请求侧事实：
+    外汇 / 数字货币对的分钟行情。
+
+    本机请求该接口持续返回风控，`Result` 内部结构尚未取得样本，因此只收录已确认的请求参数，
+    不写响应字段表、不编造示例。确认后去掉 `x-status` 并补齐响应与示例。
+
+    与股票接口的差异：请求**不带** `market_type`，货币对直接写在 `code`；
+    URL 中也没有 `srcid`、`pointType`、`newFormat`。
+
+servers:
+  - url: https://finance.pae.baidu.com
+    description: 正式站点
+
+tags:
+  - name: QuoteForexMinute
+    description: 外汇 / 数字货币对分钟行情
+
+paths:
+  /vapi/v1/getquotation:
+    get:
+      tags:
+        - QuoteForexMinute
+      operationId: getQuoteForexMinute
+      summary: 取货币对的分钟行情
+      description: |
+        参数顺序不影响结果（接口不签名）。持续 403 时应降频或更换出口网络，
+        不要按成功解析风控响应。
+      parameters:
+        - name: group
+          in: query
+          required: true
+          description: 接口分组，外汇分钟固定 `huilv_minute`。
+          schema:
+            type: string
+            enum: [huilv_minute]
+          example: huilv_minute
+        - name: need_reverse_real
+          in: query
+          required: true
+          description: 固定 `1`；字面为「需要反向真实值」，具体口径未验证，按原样传递。
+          schema:
+            type: integer
+            enum: [1]
+          example: 1
+        - name: code
+          in: query
+          required: true
+          description: |
+            货币对，6 位大写字母，形如 `<基础货币><报价货币>`（`USDCNY` 美元兑人民币、
+            `BTCUSD` 比特币兑美元）。大小写敏感。
+          schema:
+            type: string
+            pattern: '^[A-Z]{6}$'
+          example: USDCNY
+        - name: finClientType
+          in: query
+          required: true
+          description: 客户端类型，固定 `pc`。
+          schema:
+            type: string
+            enum: [pc]
+          example: pc
+      responses:
+        '200':
+          description: HTTP 200；业务成败看 `Result` 一层，风控时 `Result` 为错误对象
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                QueryID: "7852813130838806383"
+                ResultCode: 0
+                Result:
+                  code: 403
+                  isCaptchaEnabled: true
+                  msg: hit risk
+      x-todo:
+        - 正常响应的 `Result` 内部结构（字段名、`keys` 是否与股票 K 线一致）待取得真实样本
+        - 货币对非法时的业务码待实测
+        - "`need_reverse_real` 的语义待确认"
+
+components:
+  schemas:
+    Envelope:
+      type: object
+      description: 外层信封，三个百度接口共用；业务数据在 `Result` 一层。
+      required: [QueryID, ResultCode, Result]
+      properties:
+        QueryID:
+          type: string
+          description: 请求追踪 ID。
+        ResultCode:
+          type: integer
+          description: 网关层结果，`0` 表示正常处理，不代表业务成功。
+        Result:
+          type: object
+          description: 业务数据；风控时为错误对象（`code` / `isCaptchaEnabled` / `msg`）。

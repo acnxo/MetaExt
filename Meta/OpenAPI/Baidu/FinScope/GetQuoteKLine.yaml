@@ -1,0 +1,213 @@
+openapi: 3.0.3
+
+info:
+  title: 百度股市通接口 getquotation（K 线）
+  version: 1.0.0
+  description: |
+    记录 `GET /vapi/v1/getquotation` 在 `group=quotation_kline_ab` 下的 HTTP 规格：
+    取单只证券的分钟级或日级 K 线。
+
+    返回结构不是 JSON 数组，而是「`keys` + 一整个字符串」的紧凑表格：
+    `Result.newMarketData.marketData` 记录用 `;` 分隔、字段用 `,` 分隔，
+    列序由同级的 `keys` 决定，缺失值写 `--`。解析时必须按 `keys` 对齐，不要硬编码列位。
+
+    同一路径下还有 `quotation_fiveday_ab`、`huilv_minute`、`quotation_futures_minute` 三个
+    `group`，参数与响应不能互串，分别见对应的规格文件。
+
+    `ResultCode=0` 只表示网关正常处理；业务成败看 `Result` 一层——风控时 `Result` 会被
+    替换为 `{"code": 403, "isCaptchaEnabled": true, "msg": "hit risk"}`。
+
+servers:
+  - url: https://finance.pae.baidu.com
+    description: 正式站点
+
+tags:
+  - name: QuoteKLine
+    description: 分钟 / 日级 K 线
+
+paths:
+  /vapi/v1/getquotation:
+    get:
+      tags:
+        - QuoteKLine
+      operationId: getQuoteKLine
+      summary: 取分钟级或日级 K 线
+      description: |
+        前 5 个参数为固定值，后 7 个为业务参数；参数顺序不影响结果（接口不签名）。
+        本接口风控命中率较高，持续 403 时应降频或更换出口网络。
+      parameters:
+        - name: srcid
+          in: query
+          required: true
+          description: 来源标识，固定 `5353`。
+          schema:
+            type: string
+            enum: ["5353"]
+          example: "5353"
+        - name: pointType
+          in: query
+          required: true
+          description: 点位类型，固定 `string`，决定 `marketData` 以字符串表格返回。
+          schema:
+            type: string
+            enum: [string]
+          example: string
+        - name: group
+          in: query
+          required: true
+          description: 接口分组，本接口固定 `quotation_kline_ab`。
+          schema:
+            type: string
+            enum: [quotation_kline_ab]
+          example: quotation_kline_ab
+        - name: newFormat
+          in: query
+          required: true
+          description: 新返回格式，固定 `1`。
+          schema:
+            type: integer
+            enum: [1]
+          example: 1
+        - name: finClientType
+          in: query
+          required: true
+          description: 客户端类型，固定 `pc`。
+          schema:
+            type: string
+            enum: [pc]
+          example: pc
+        - name: code
+          in: query
+          required: true
+          description: 证券代码，格式随 `market_type` 变化：A 股 6 位、港股 5 位、美股字母。
+          schema:
+            type: string
+          example: "600009"
+        - name: query
+          in: query
+          required: true
+          description: 搜索词，取与 `code` 相同的值。
+          schema:
+            type: string
+          example: "600009"
+        - name: market_type
+          in: query
+          required: true
+          description: |
+            市场类型：`ab` A 股、`hk` 港股、`us` 美股。`group` 名称自带 A 股后缀，
+            切换市场时需同时确认 `group` 是否仍可用，不能只改本参数。
+          schema:
+            type: string
+            enum: [ab, hk, us]
+          example: ab
+        - name: name
+          in: query
+          required: false
+          description: 证券简称，可空；传了更贴近浏览器真实请求。
+          schema:
+            type: string
+          example: 上海机场
+        - name: is_kc
+          in: query
+          required: true
+          description: |
+            注册制板块标记：代码段 `688` / `689`（科创板）、`30`（创业板）、`8` / `4`
+            （北交所）取 `1`，其它取 `0`；港股 / 美股无注册制概念，固定 `0`。
+          schema:
+            type: integer
+            enum: [0, 1]
+          example: 0
+        - name: ktype
+          in: query
+          required: true
+          description: |
+            K 线周期，`min1` 默认值、`min5`、`day` 为已验证取值；`min15` / `min30` /
+            `min60` / `week` / `month` 未逐一验证。
+          schema:
+            type: string
+            enum: [min1, min5, day]
+            default: min1
+          example: min1
+        - name: count
+          in: query
+          required: true
+          description: 返回条数，建议 `241`（覆盖一个交易日的分钟线）。
+          schema:
+            type: integer
+          example: 241
+      responses:
+        '200':
+          description: HTTP 200；业务成败看 `Result` 一层
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KLineResponse'
+              example:
+                QueryID: "1034999479576860943"
+                ResultNum: 0
+                ResultCode: 0
+                Result:
+                  newMarketData:
+                    headers: [时间戳, 时间, 开盘, 收盘, 成交量, 最高, 最低, 成交额, 涨跌额, 涨跌幅, 换手率, 昨收, ma5均价, ma5成交量, ma10均价, ma10成交量, ma20均价, ma20成交量]
+                    keys: [timestamp, time, open, close, volume, high, low, amount, range, ratio, turnoverratio, preClose, ma5avgprice, ma5volume, ma10avgprice, ma10volume, ma20avgprice, ma20volume]
+                    marketData: "1794449220,2026-11-12 10:07,23.94,23.94,26300,23.95,23.92,629596.00,+0.01,+0.04,--,23.93,--,--,--,--,--,--;1794449280,2026-11-12 10:08,23.95,23.94,16300,23.96,23.94,390346.00,0.00,0.00,--,23.94,--,--,--,--,--,--"
+      x-todo:
+        - 港股 / 美股（`market_type=hk|us`）未实测，本机持续风控
+        - "`min15` / `min30` / `min60` / `week` / `month` 周期未验证"
+
+components:
+  schemas:
+    KLineResponse:
+      type: object
+      required: [QueryID, ResultCode, Result]
+      properties:
+        QueryID:
+          type: string
+          description: 请求追踪 ID。
+        ResultNum:
+          type: integer
+          description: 本接口实测恒为 `0`。
+        ResultCode:
+          type: integer
+          description: 网关层结果，`0` 表示正常处理，不代表业务成功。
+        Result:
+          oneOf:
+            - $ref: '#/components/schemas/KLineResult'
+            - $ref: '#/components/schemas/RiskControlResult'
+    RiskControlResult:
+      type: object
+      description: 风控响应；外层 `ResultCode` 仍为 `0`。
+      required: [code, isCaptchaEnabled, msg]
+      properties:
+        code:
+          type: integer
+          description: 业务层错误码，风控为 `403`。
+        isCaptchaEnabled:
+          type: boolean
+          description: 是否要求验证码，普通 HTTP 请求无法通过。
+        msg:
+          type: string
+          description: 错误描述，风控为 `hit risk`。
+    KLineResult:
+      type: object
+      properties:
+        newMarketData:
+          $ref: '#/components/schemas/KLineData'
+    KLineData:
+      type: object
+      properties:
+        headers:
+          type: array
+          description: 中文列名，仅供阅读。
+          items:
+            type: string
+        keys:
+          type: array
+          description: 字段名，**决定 `marketData` 的列顺序**。
+          items:
+            type: string
+        marketData:
+          type: string
+          description: |
+            全部 K 线记录。记录用 `;` 分隔、字段用 `,` 分隔，顺序与 `keys` 一一对应，
+            缺失值写 `--`；末尾可能带空记录，字段数不足的记录应跳过。

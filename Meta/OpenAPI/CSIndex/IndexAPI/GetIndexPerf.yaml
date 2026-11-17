@@ -1,0 +1,118 @@
+openapi: 3.0.3
+
+info:
+  title: 中证指数官网指数表现接口
+  version: 1.0.0
+  description: |
+    记录 `GET /csindex-home/perf/index-perf` 的 HTTP 规格：按指数代码取指定区间的日行情。
+
+    指数有发布日，早于发布日的区间没有数据（中证 2000 为 2023-08-11）。
+    `tradeDate` 可能是 `yyyyMMdd` 或 `yyyy-MM-dd`，本库统一归一化为 `yyyy-MM-dd`；
+    官网偶有非交易日重复行，本库按日期去重保留最后一条。
+
+servers:
+  - url: https://www.csindex.com.cn
+    description: 官网
+
+tags:
+  - name: IndexAPI
+    description: 中证指数接口
+
+paths:
+  /csindex-home/perf/index-perf:
+    get:
+      tags:
+        - IndexAPI
+      operationId: getIndexPerf
+      summary: 拉取指数日行情
+      description: |
+        必须带 `referer: https://www.csindex.com.cn/`。日期参数用紧凑格式 `yyyyMMdd`。
+      parameters:
+        - name: indexCode
+          in: query
+          required: true
+          description: 指数代码（六位数字）。
+          schema:
+            type: string
+            example: "932000"
+        - name: startDate
+          in: query
+          required: false
+          description: 起始日期 `yyyyMMdd`。
+          schema:
+            type: string
+            example: "20230811"
+        - name: endDate
+          in: query
+          required: false
+          description: 结束日期 `yyyyMMdd`。
+          schema:
+            type: string
+            example: "20261113"
+      responses:
+        '200':
+          description: HTTP 200；业务可用性看 data 是否为空
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexPerfResponse'
+              example:
+                code: 200
+                data:
+                  - tradeDate: "20261113"
+                    open: "6201.33"
+                    high: "6230.11"
+                    low: "6170.55"
+                    close: "6188.07"
+                    change: "-13.26"
+                    changeRatio: "-0.21"
+
+components:
+  schemas:
+    IndexPerfResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 站点不同版本取值不同（200 或 0），本库只判断 data 是否存在。
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexPerfRow'
+    IndexPerfRow:
+      type: object
+      description: 数值字段可能是字符串或数字。
+      properties:
+        tradeDate:
+          type: string
+          description: 交易日，`yyyyMMdd` 或 `yyyy-MM-dd`。
+        open:
+          oneOf:
+            - type: string
+            - type: number
+          description: 开盘（点）。
+        high:
+          oneOf:
+            - type: string
+            - type: number
+          description: 最高（点）。
+        low:
+          oneOf:
+            - type: string
+            - type: number
+          description: 最低（点）。
+        close:
+          oneOf:
+            - type: string
+            - type: number
+          description: 收盘（点）；缺失或 ≤0 的行被丢弃。
+        change:
+          oneOf:
+            - type: string
+            - type: number
+          description: 涨跌点数。
+        changeRatio:
+          oneOf:
+            - type: string
+            - type: number
+          description: 涨跌幅（%）。

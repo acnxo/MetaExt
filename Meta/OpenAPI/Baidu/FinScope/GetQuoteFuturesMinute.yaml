@@ -1,0 +1,141 @@
+openapi: 3.0.3
+x-status: placeholder
+
+info:
+  title: 百度股市通接口 getquotation（期货分钟）
+  version: 0.1.0
+  description: |
+    **占位规格**。记录 `GET /vapi/v1/getquotation` 在 `group=quotation_futures_minute` 下的
+    请求侧事实：期货合约的分钟行情。
+
+    本机请求该 `group` 持续返回风控，`Result` 内部结构尚未取得样本，因此只收录已确认的
+    请求参数，不写响应字段表、不编造示例。确认后去掉 `x-status` 并补齐响应与示例。
+
+    与股票 K 线的差异：多出 `all`、`eprop`、`financeType` 三个期货专用参数；
+    `market_type=ab` 在本组表示国内商品期货而不是 A 股。
+
+servers:
+  - url: https://finance.pae.baidu.com
+    description: 正式站点
+
+tags:
+  - name: QuoteFuturesMinute
+    description: 期货分钟行情
+
+paths:
+  /vapi/v1/getquotation:
+    get:
+      tags:
+        - QuoteFuturesMinute
+      operationId: getQuoteFuturesMinute
+      summary: 取期货合约的分钟行情
+      description: |
+        参数顺序不影响结果（接口不签名）。合约代码规则：国内品种用「品种字母 + 合约数字」
+        （`AU888` 主力连续、`AU2612` 具体月份），外盘用「品种代码 + 两位年份 + 月份码」
+        （`GC26Z` 为 COMEX 黄金 2026 年 12 月）。
+      parameters:
+        - name: srcid
+          in: query
+          required: true
+          description: 来源标识，固定 `5353`。
+          schema:
+            type: string
+            enum: ["5353"]
+          example: "5353"
+        - name: all
+          in: query
+          required: true
+          description: 返回全部字段，固定 `1`。
+          schema:
+            type: integer
+            enum: [1]
+          example: 1
+        - name: code
+          in: query
+          required: true
+          description: 期货合约代码。
+          schema:
+            type: string
+          example: AU888
+        - name: query
+          in: query
+          required: true
+          description: 搜索词，取与 `code` 相同的值。
+          schema:
+            type: string
+          example: AU888
+        - name: eprop
+          in: query
+          required: true
+          description: 周期属性，分钟线固定 `min`。
+          schema:
+            type: string
+            enum: [min]
+          example: min
+        - name: financeType
+          in: query
+          required: true
+          description: 品种类型，期货固定 `futures`。
+          schema:
+            type: string
+            enum: [futures]
+          example: futures
+        - name: group
+          in: query
+          required: true
+          description: 接口分组，固定 `quotation_futures_minute`。
+          schema:
+            type: string
+            enum: [quotation_futures_minute]
+          example: quotation_futures_minute
+        - name: market_type
+          in: query
+          required: true
+          description: 市场，`ab` 国内商品期货、`us` 美国市场期货。
+          schema:
+            type: string
+            enum: [ab, us]
+          example: ab
+        - name: finClientType
+          in: query
+          required: true
+          description: 客户端类型，固定 `pc`。
+          schema:
+            type: string
+            enum: [pc]
+          example: pc
+      responses:
+        '200':
+          description: HTTP 200；业务成败看 `Result` 一层，风控时 `Result` 为错误对象
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                ResultCode: 0
+                Result:
+                  code: 403
+                  isCaptchaEnabled: true
+                  msg: hit risk
+      x-todo:
+        - 正常响应的 `Result` 内部结构待取得真实样本
+        - "`keys` 是否包含期货特有字段（持仓量、结算价等）待确认"
+        - 合约非法 / 已交割时的业务码待实测
+        - 外盘期货（`market_type=us`）未实测
+
+components:
+  schemas:
+    Envelope:
+      type: object
+      description: 外层信封，三个百度接口共用；业务数据在 `Result` 一层。
+      required: [ResultCode, Result]
+      properties:
+        QueryID:
+          type: string
+          description: 请求追踪 ID，部分响应未携带。
+        ResultCode:
+          type: integer
+          description: 网关层结果，`0` 表示正常处理，不代表业务成功。
+        Result:
+          type: object
+          description: 业务数据；风控时为错误对象（`code` / `isCaptchaEnabled` / `msg`）。
